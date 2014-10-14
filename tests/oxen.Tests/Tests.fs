@@ -1,10 +1,11 @@
 module oxen.Tests
 
 open oxen
-open NUnit.Framework
+open Xunit
+open FsUnit.Xunit
 
-[<Test>]
+[<Fact>]
 let ``hello returns 42`` () =
   let result = Library.hello 42
   printfn "%i" result
-  Assert.AreEqual(42,result)
+  result |> should equal 42
