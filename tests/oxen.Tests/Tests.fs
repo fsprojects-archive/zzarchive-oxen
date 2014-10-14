@@ -4,8 +4,10 @@ open oxen
 open NUnit.Framework
 open Foq
 open StackExchange.Redis
+open Xunit
+open FsUnit.Xunit
 
-[<Test>]
+[<Fact>]
 let ``hello returns 42`` () =
   let result = Library.hello 42
   printfn "%i" result
@@ -842,3 +844,4 @@ db.
 //
 //  });
 //});
+  result |> should equal 42
