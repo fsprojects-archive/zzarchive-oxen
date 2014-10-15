@@ -13,6 +13,7 @@ let ``hello returns 42`` () =
   result |> should equal 42
 
 let redis = ConnectionMultiplexer.Connect("localhost")  
+//let redis = ConnectionMultiplexer.Connect("localhost")  
 //let db = redis.GetDatabase();
 
 
