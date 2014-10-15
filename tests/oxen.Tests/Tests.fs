@@ -1,7 +1,6 @@
 module oxen.Tests
 
 open oxen
-open NUnit.Framework
 open Foq
 open StackExchange.Redis
 open Xunit
@@ -11,15 +10,14 @@ open FsUnit.Xunit
 let ``hello returns 42`` () =
   let result = Library.hello 42
   printfn "%i" result
-  Assert.AreEqual(42,result)
+  result |> should equal 42
 
 let redis = ConnectionMultiplexer.Connect("localhost")  
-let db = redis.GetDatabase();
+//let db = redis.GetDatabase();
 
 
 let db = Mock<IDatabase>()
 
-db.
 
 /////////////////////////////////////////////////////////////////////////////
 // queue tests uit bull.js
@@ -844,4 +842,3 @@ db.
 //
 //  });
 //});
-  result |> should equal 42
