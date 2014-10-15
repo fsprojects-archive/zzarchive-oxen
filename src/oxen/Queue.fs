@@ -1,2 +1,3 @@
-﻿module Queue
+﻿namespace oxen
+module Queue = ()
 

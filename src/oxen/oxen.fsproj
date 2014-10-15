@@ -59,8 +59,6 @@
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
   <ItemGroup>
-    <Compile Include="Library.fs" />
-    <None Include="Script.fsx" />
     <Content Include="app.config" />
     <Content Include="packages.config" />
     <Content Include="packages.config" />

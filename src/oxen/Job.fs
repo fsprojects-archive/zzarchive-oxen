@@ -1,2 +1,3 @@
-﻿module Job
+﻿namespace oxen
+module Job = ()
 
