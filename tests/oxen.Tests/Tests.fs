@@ -17,8 +17,16 @@ let redis = ConnectionMultiplexer.Connect("localhost")
 //let db = redis.GetDatabase();
 
 
-let db = Mock<IDatabase>()
+let db = Mock<IDatabase>().Create()
 
+// bulljs api
+// Queue constructor Queue(naam, port, ip, { other node_redis options })
+// queue.process(function(job, done){})
+// queue.add(job)
+// queue.pause().then(function(){})
+// queue.resume().then(function (){})
+// queue.on(completed/failed/progress/paused/resumed)
+// 
 
 /////////////////////////////////////////////////////////////////////////////
 // queue tests uit bull.js
