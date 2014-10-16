@@ -13,8 +13,8 @@ type Data = {
     value: string
 }
 let taskHash = Task.Factory.StartNew(fun () -> ())
-let taskIncr = Task.Factory.StartNew(fun () -> int64 1)
-let taskLPush = Task.Factory.StartNew(fun () -> int64 1)
+let taskIncr = Task.Factory.StartNew(fun () -> 1L)
+let taskLPush = Task.Factory.StartNew(fun () -> 1L)
 
 
 [<Fact>]
@@ -35,6 +35,7 @@ let ``should be able to add a job to the queue`` () =
     
     // Then
     job.data.value |> should equal "test"
+    job.jobId |> should equal 1L
     verify <@ db.HashSetAsync(any(), any()) @> once
     verify <@ db.StringIncrementAsync(any()) @> once
     verify <@ db.ListLeftPushAsync(any(), any(), any(), any()) @> once
