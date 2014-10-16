@@ -52,28 +52,28 @@ type Job<'a> =
         }
 
 
-and Queue (name, db:IDatabase) as q =
-    member this.toKey (kind:string) = RedisKey.op_Implicit(("bull:" + name + ":" + kind))
-    member this.client = db
-    member this.process (handler:(Job<_> * unit -> unit) -> unit) = () //process is reserved for future use
-    member this.add (data, ?opts:Map<string,string>) = 
+and Queue (name, db:IDatabase) as this =
+    member x.toKey (kind:string) = RedisKey.op_Implicit(("bull:" + name + ":" + kind))
+    member x.client = db
+    member x.process (handler:(Job<_> * unit -> unit) -> unit) = () //process is reserved for future use
+    member x.add (data, ?opts:Map<string,string>) = 
         async {
-            let! jobId = q.client.StringIncrementAsync (this.toKey "id") |> Async.AwaitTask
-            let! job = Job<_>.create (q, jobId, data, opts) 
+            let! jobId = this.client.StringIncrementAsync (this.toKey "id") |> Async.AwaitTask
+            let! job = Job<_>.create (this, jobId, data, opts) 
             let key = this.toKey "wait"
             let! res = 
                 Async.AwaitTask <|
                 match opts with
-                | None -> q.client.ListLeftPushAsync (key, toValueI64 jobId) 
+                | None -> this.client.ListLeftPushAsync (key, toValueI64 jobId) 
                 | Some x -> 
                     if x.ContainsKey "lifo" && bool.Parse (x.Item "lifo") 
-                    then  q.client.ListRightPushAsync (key, toValueI64 jobId) 
-                    else q.client.ListLeftPushAsync (key, toValueI64 jobId) 
+                    then this.client.ListRightPushAsync (key, toValueI64 jobId) 
+                    else this.client.ListLeftPushAsync (key, toValueI64 jobId) 
             return job
         }
-    member this.pause () = async { raise (NotImplementedException ()) }
-    member this.resume () = async { raise (NotImplementedException ()) }
-    member this.on () = async { raise (NotImplementedException ()) }
-    member this.count () = async { raise (NotImplementedException ()) }
-    member this.empty () = async { raise (NotImplementedException ()) }
-    member this.getJob (id:string) = async { raise (NotImplementedException ()) }
+    member x.pause () = async { raise (NotImplementedException ()) }
+    member x.resume () = async { raise (NotImplementedException ()) }
+    member x.on () = async { raise (NotImplementedException ()) }
+    member x.count () = async { raise (NotImplementedException ()) }
+    member x.empty () = async { raise (NotImplementedException ()) }
+    member x.getJob (id:string) = async { raise (NotImplementedException ()) }
