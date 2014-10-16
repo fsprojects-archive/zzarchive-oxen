@@ -58,11 +58,11 @@ type Job<'a> =
             let client = queue.client
             let! job = client.HashGetAllAsync (jobId) |> Async.AwaitTask
             //staan hash values altijd op dezelfde volgorde
-            return Job.fromData(queue, job.[0].Value |> fromValueI64, job.[1].Value |> fromValueStr, job.[2].Value |> fromValueStr, job.[3].Value |> fromValueI32) 
+            return Job.fromData (queue, job.[0].Value |> fromValueI64, job.[1].Value |> fromValueStr, job.[2].Value |> fromValueStr, job.[3].Value |> fromValueI32) 
         }
     static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int) =
-        let sData = JsonConvert.DeserializeObject(data) :?> 'a
-        let sOpts = JsonConvert.DeserializeObject(opts) :?> Map<string, string> option
+        let sData = JsonConvert.DeserializeObject<'a>(data)
+        let sOpts = JsonConvert.DeserializeObject<Map<string, string> option>(opts)
         { queue = queue; data = sData; jobId = jobId; opts = sOpts; _progress = progress }
 
 and OxenEvent<'a> =

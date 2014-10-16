@@ -15,6 +15,48 @@ type Data = {
 let taskHash = Task.Factory.StartNew(fun () -> ())
 let taskIncr = Task.Factory.StartNew(fun () -> 1L)
 let taskLPush = Task.Factory.StartNew(fun () -> 1L)
+let taskJobHash = Task.Factory.StartNew(fun () -> 
+    [|
+        HashEntry(toValueStr "id", toValueI64 1L)
+        HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
+        HashEntry(toValueStr "opts", toValueStr "")
+        HashEntry(toValueStr "progress", toValueI32 1)
+    |])
+
+type JobFixture () = 
+    [<Fact>]
+    let ``should create a new job from given json data`` () =
+        // Given
+        let q = Mock<Queue<Data>>().Create()
+
+        // When
+        let job = Job.fromData(q, 1L, "{ \"value\": \"test\" }", "", 1)
+
+        // Then
+        job.data.value |> should equal "test"
+        job.jobId |> should equal 1L
+        job._progress |> should equal 1
+
+    [<Fact>]
+    let ``should get a job from the cache and make it into a real one`` () =
+        // Given
+        let db = Mock<IDatabase>.With(fun d ->
+            <@
+                d.HashGetAllAsync ((any ()), (any ())) --> taskJobHash
+            @>
+        )
+
+        let q = Queue<Data>("stuff", db)
+        let key:RedisKey = RedisKey.op_Implicit("1")
+
+        // When 
+        let job = Job.fromId(q, key) |> Async.RunSynchronously
+        
+        // Then
+        job.data.value |> should equal "test"
+        job.jobId |> should equal 1L
+        job._progress |> should equal 1
+
 
 type QueueFixture () =
 
