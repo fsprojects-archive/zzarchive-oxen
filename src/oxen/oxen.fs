@@ -1,8 +1,7 @@
 ﻿namespace oxen
+
 open System
 open StackExchange.Redis
-//open Xunit
-//open FsUnit.Xunit
 open System.Threading.Tasks
 open Newtonsoft.Json
 
@@ -38,7 +37,7 @@ type Job<'a> =
         [|
             HashEntry(toValueStr "data", toValueStr jsData)
             HashEntry(toValueStr "opts", toValueStr jsOpts)
-            HashEntry(toValueStr "progress", toValueI32 this._progress )
+            HashEntry(toValueStr "progress", toValueI32 this._progress)
         |]
     member this.remove () = async { raise (NotImplementedException ()) }
     member this.progress cnt = async { raise (NotImplementedException ()) }
@@ -65,10 +64,11 @@ and Queue (name, db:IDatabase) as this =
                 Async.AwaitTask <|
                 match opts with
                 | None -> this.client.ListLeftPushAsync (key, toValueI64 jobId) 
-                | Some x -> 
-                    if x.ContainsKey "lifo" && bool.Parse (x.Item "lifo") 
+                | Some opts -> 
+                    if opts.ContainsKey "lifo" && bool.Parse (opts.Item "lifo") 
                     then this.client.ListRightPushAsync (key, toValueI64 jobId) 
                     else this.client.ListLeftPushAsync (key, toValueI64 jobId) 
+
             return job
         }
     member x.pause () = async { raise (NotImplementedException ()) }
