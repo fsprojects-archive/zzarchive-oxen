@@ -29,7 +29,8 @@ let ``should be able to add a job to the queue`` () =
     )
 
     let queue = Queue ("test", db)
-    let job = queue.add ({value = "test"}) |> Async.RunSynchronously
+    let pietje = queue.add ({value = "test"}, [("d","d")] |> Map.ofList )
+    let job = pietje |> Async.RunSynchronously
     job.data.value |> should equal "test"
 
     verify <@ db.HashSetAsync(any(), any()) @> once
