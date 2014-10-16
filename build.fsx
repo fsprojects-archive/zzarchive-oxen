@@ -128,7 +128,6 @@ Target "RunTests" (fun _ ->
     |> xUnit (fun p ->
         { p with
             ToolPath = "./packages/xunit.runners/tools/xunit.console.clr4.exe"
-            XmlOutput = true
             TimeOut = TimeSpan.FromMinutes 20.
             OutputDir = "./" })
 )
