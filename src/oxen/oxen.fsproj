@@ -61,8 +61,6 @@
   <ItemGroup>
     <Content Include="app.config" />
     <Content Include="packages.config" />
-    <Content Include="packages.config" />
-    <Content Include="app.config" />
     <Compile Include="oxen.fs" />
   </ItemGroup>
   <ItemGroup>

@@ -21,10 +21,10 @@ module Async =
         task.ContinueWith continuation |> Async.AwaitTask
  
     let inline startAsPlainTask (work : Async<unit>) = Task.Factory.StartNew(fun () -> work |> Async.RunSynchronously)
-    
+
 type Job<'a> = 
     {
-        queue: Queue
+        queue: Queue<'a>
         data: 'a
         jobId: int64
         opts: Map<string,string> option
@@ -32,7 +32,7 @@ type Job<'a> =
     }
     member this.toData () =  
         let jsData = JsonConvert.SerializeObject(this.data)
-        let jsOpts = JsonConvert.SerializeObject(this.opts)
+        let jsOpts = JsonConvert.SerializeObject (this.opts)
 
         [|
             HashEntry(toValueStr "data", toValueStr jsData)
@@ -42,7 +42,7 @@ type Job<'a> =
     member this.remove () = async { raise (NotImplementedException ()) }
     member this.progress cnt = async { raise (NotImplementedException ()) }
 
-    static member create (queue, jobId, data, opts) = 
+    static member create (queue, jobId, data:'a, opts) = 
         async { 
             let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0 }
             let client:IDatabase = queue.client
@@ -50,15 +50,22 @@ type Job<'a> =
             return job 
         }
 
+and OxenEvent<'a> =
+    {
+        job: Job<'a> option
+        progress: int option
+        err: exn option
+    }
 
-and Queue (name, db:IDatabase) as this =
-    member x.toKey (kind:string) = RedisKey.op_Implicit(("bull:" + name + ":" + kind))
+and Queue<'a> (name, db:IDatabase) as this =
+    let event = new Event<OxenEvent<'a>> ()
+    member x.toKey (kind:string) = RedisKey.op_Implicit ("bull:" + name + ":" + kind)
     member x.client = db
-    member x.process (handler:(Job<_> * unit -> unit) -> unit) = () //process is reserved for future use
+    member x.process (handler:(Job<'a> * unit -> unit) -> unit) = () //process is reserved for future use
     member x.add (data, ?opts:Map<string,string>) = 
         async {
             let! jobId = this.client.StringIncrementAsync (this.toKey "id") |> Async.AwaitTask
-            let! job = Job<_>.create (this, jobId, data, opts) 
+            let! job = Job<'a>.create (this, jobId, data, opts) 
             let key = this.toKey "wait"
             let! res = 
                 Async.AwaitTask <|
