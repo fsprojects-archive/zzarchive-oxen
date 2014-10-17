@@ -15,6 +15,7 @@ type Data = {
 let taskHash = Task.Factory.StartNew(fun () -> ())
 let taskIncr = Task.Factory.StartNew(fun () -> 1L)
 let taskLPush = Task.Factory.StartNew(fun () -> 1L)
+let taskTrue = Task.Factory.StartNew(fun () -> true)
 let taskJobHash = Task.Factory.StartNew(fun () -> 
     [|
         HashEntry(toValueStr "id", toValueI64 1L)
@@ -57,6 +58,56 @@ type JobFixture () =
         job.jobId |> should equal 1L
         job._progress |> should equal 1
 
+    [<Fact>]
+    let ``should be able to take a lock on a job`` () =
+        // Given
+        let db = Mock<IDatabase>.With(fun d ->
+            <@
+                d.StringSetAsync ((any ()), (any ()), (any ()), (any ())) --> taskTrue
+            @>
+        )
+        
+        let q = Queue<Data>("test", db);
+        let job = {
+            jobId = 1L
+            queue = q
+            data = { value = "string" }
+            opts = None
+            _progress = 0
+        }
+        
+        // When
+        let taken = job.takeLock (Guid.NewGuid ()) |> Async.RunSynchronously
+
+        // Then
+        taken |> should be True
+        verify <@ db.StringSetAsync ((any()), (any()), (any()), (any())) @> once
+
+    
+    [<Fact>]
+    let ``should be able to renew a lock on a job`` () =
+        // Given
+        let db = Mock<IDatabase>.With(fun d ->
+            <@
+                d.StringSetAsync ((any ()), (any ()), (any ()), (any ())) --> taskTrue
+            @>
+        )
+                
+        let q = Queue<Data>("test", db);
+        let job = {
+            jobId = 1L
+            queue = q
+            data = { value = "string" }
+            opts = None
+            _progress = 0
+        }
+        
+        // When
+        let taken = job.takeLock (Guid.NewGuid (), true) |> Async.RunSynchronously
+
+        // Then
+        taken |> should be True
+        verify <@ db.StringSetAsync ((any()), (any()), (any()), When.NotExists) @> once
 
 type QueueFixture () =
 
@@ -94,6 +145,7 @@ type QueueFixture () =
 
         // Then
         result |> should equal "bull:test:stuff"
+
 
 //type vl = {id:string; status:string}
 //let redis = ConnectionMultiplexer.Connect("curittest.redis.cache.windows.net:6379,password=T/ncgOLWjN8DlIz3g/fzG9qgdTZiN+n2b4QCNQv3PzQ=")  

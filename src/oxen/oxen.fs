@@ -13,6 +13,7 @@ module OxenConvenience =
     let fromValueStr (x:RedisValue):string = RedisValue.op_Implicit (x)
     let fromValueI64 (x:RedisValue):int64 = Int64.Parse (RedisValue.op_Implicit (x))
     let fromValueI32 (x:RedisValue):int = Int32.Parse (RedisValue.op_Implicit (x))
+    let LOCK_RENEW_TIME = 5000.0
 
 module Async =
     let inline awaitPlainTask (task: Task) = 
@@ -45,7 +46,16 @@ type Job<'a> =
 
     member this.remove () = async { raise (NotImplementedException ()) }
     member this.progress cnt = async { raise (NotImplementedException ()) }
-
+    member this.takeLock (token, ?renew) = async {
+            let lockKey = this.queue.toKey((this.jobId.ToString ()) + ":lock")
+            let nx = match renew with 
+                     | Some x -> When.NotExists
+                     | None -> When.Always
+        
+            let value = (token.ToString ()) |> toValueStr
+            let client:IDatabase = this.queue.client
+            return! client.StringSetAsync (lockKey, value, Nullable (TimeSpan.FromMilliseconds (LOCK_RENEW_TIME)), nx) |> Async.AwaitTask
+        }
     static member create (queue, jobId, data:'a, opts) = 
         async { 
             let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0 }
@@ -73,8 +83,22 @@ and OxenEvent<'a> =
     }
 
 and Queue<'a> (name, db:IDatabase) as this =
+    let token = Guid.NewGuid ()
     let event = new Event<OxenEvent<'a>> ()
-    let processStalledJob job = async { () }
+    let processJob job = async { 
+            () 
+        }
+    let processStalledJob (job:Job<'a>) = 
+        async { 
+            let! lock = job.takeLock token
+            match lock with
+            | true -> 
+                let key = this.toKey("completed");
+                let! contains = this.client.SetContainsAsync (key, job.jobId |> toValueI64) |> Async.AwaitTask
+                if contains then 
+                    do! processJob(job)
+            | false -> ()
+        }
     let processStaledJobs () = 
         async {
             let! range = db.ListRangeAsync (this.toKey ("active"), 0L, -1L) |> Async.AwaitTask
