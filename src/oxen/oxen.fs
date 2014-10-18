@@ -99,7 +99,7 @@ and Queue<'a> (name, db:IDatabase) as this =
                     do! processJob(job)
             | false -> ()
         }
-    let processStaledJobs () = 
+    let processStalledJobs () = 
         async {
             let! range = db.ListRangeAsync (this.toKey ("active"), 0L, -1L) |> Async.AwaitTask
             let jobs = 
