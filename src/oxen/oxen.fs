@@ -34,6 +34,7 @@ type Job<'a> =
         opts: Map<string,string> option
         _progress: int
     }
+    member this.lockKey () = this.queue.toKey((this.jobId.ToString ()) + ":lock")
     member this.toData () =  
         let jsData = JsonConvert.SerializeObject (this.data)
         let jsOpts = JsonConvert.SerializeObject (this.opts)
@@ -47,15 +48,29 @@ type Job<'a> =
     member this.remove () = async { raise (NotImplementedException ()) }
     member this.progress cnt = async { raise (NotImplementedException ()) }
     member this.takeLock (token, ?renew) = async {
-            let lockKey = this.queue.toKey((this.jobId.ToString ()) + ":lock")
             let nx = match renew with 
                      | Some x -> When.NotExists
-                     | None -> When.Always
-        
+                     | None -> When.Always     
             let value = (token.ToString ()) |> toValueStr
             let client:IDatabase = this.queue.client
-            return! client.StringSetAsync (lockKey, value, Nullable (TimeSpan.FromMilliseconds (LOCK_RENEW_TIME)), nx) |> Async.AwaitTask
+            return! 
+                client.StringSetAsync (
+                    this.lockKey (), 
+                    value, 
+                    Nullable (TimeSpan.FromMilliseconds (LOCK_RENEW_TIME)), 
+                    nx 
+                ) |> Async.AwaitTask
         }
+    member this.renewLock token = this.takeLock (token, true)
+    member this.releaseLock token =
+        let script = @"
+            if redis.call("get", KEYS[1]) == ARGV[1] \n
+            then \n
+            return redis.call("del", KEYS[1]) \n
+            else \n
+            return 0 \n
+            end \n" 
+        this.queue.client.ScriptEvaluateAsync ()
     static member create (queue, jobId, data:'a, opts) = 
         async { 
             let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0 }
@@ -86,7 +101,12 @@ and Queue<'a> (name, db:IDatabase) as this =
     let token = Guid.NewGuid ()
     let event = new Event<OxenEvent<'a>> ()
     let processJob job = async { 
-            () 
+            // if paused then return else
+            // processing <- true; job.renewLock(); renewlocktimeout <- settimeout;
+            //try -> handler(); job.moveToCompleted; emit "completed"
+            // catch -> job.moveToFailed; job.releaseLock; emit "failed"
+            //cleartimeout(lockrenewtimeout); processing <- false 
+            ()
         }
     let processStalledJob (job:Job<'a>) = 
         async { 
