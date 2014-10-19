@@ -13,6 +13,7 @@ module OxenConvenience =
     let fromValueStr (x:RedisValue):string = RedisValue.op_Implicit (x)
     let fromValueI64 (x:RedisValue):int64 = Int64.Parse (RedisValue.op_Implicit (x))
     let fromValueI32 (x:RedisValue):int = Int32.Parse (RedisValue.op_Implicit (x))
+    let LOCK_RENEW_TIME = 5000.0
 
 module Async =
     let inline awaitPlainTask (task: Task) = 
@@ -33,6 +34,7 @@ type Job<'a> =
         opts: Map<string,string> option
         _progress: int
     }
+    member this.lockKey () = this.queue.toKey((this.jobId.ToString ()) + ":lock")
     member this.toData () =  
         let jsData = JsonConvert.SerializeObject (this.data)
         let jsOpts = JsonConvert.SerializeObject (this.opts)
@@ -45,7 +47,39 @@ type Job<'a> =
 
     member this.remove () = async { raise (NotImplementedException ()) }
     member this.progress cnt = async { raise (NotImplementedException ()) }
+    member this.takeLock (token, ?renew) = async {
+            let nx = match renew with 
+                     | Some x -> When.NotExists
+                     | None -> When.Always     
+            let value = (token.ToString ()) |> toValueStr
+            let client:IDatabase = this.queue.client
+            return! 
+                client.StringSetAsync (
+                    this.lockKey (), 
+                    value, 
+                    Nullable (TimeSpan.FromMilliseconds (LOCK_RENEW_TIME)), 
+                    nx 
+                ) |> Async.AwaitTask
+        }
+    member this.renewLock token = this.takeLock (token, true)
+    member this.releaseLock (token):Async<int> = async {
+        let script = 
+            "if redis.call(\"get\", KEYS[1]) == ARGV[1] \n\
+            then \n\
+            return redis.call(\"del\", KEYS[1]) \n\
+            else \n\
+            return 0 \n\
+            end \n"
 
+        let! result = 
+            this.queue.client.ScriptEvaluateAsync (
+                script, 
+                [|this.lockKey()|], 
+                [|(token.ToString ()) |> toValueStr|]
+             ) |> Async.AwaitTask
+        return result |> RedisResult.op_Explicit
+    }
+ 
     static member create (queue, jobId, data:'a, opts) = 
         async { 
             let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0 }
@@ -73,9 +107,28 @@ and OxenEvent<'a> =
     }
 
 and Queue<'a> (name, db:IDatabase) as this =
+    let token = Guid.NewGuid ()
     let event = new Event<OxenEvent<'a>> ()
-    let processStalledJob job = async { () }
-    let processStaledJobs () = 
+    let processJob job = async { 
+            // if paused then return else
+            // processing <- true; job.renewLock(); renewlocktimeout <- settimeout;
+            //try -> handler(); job.moveToCompleted; emit "completed"
+            // catch -> job.moveToFailed; job.releaseLock; emit "failed"
+            //cleartimeout(lockrenewtimeout); processing <- false 
+            ()
+        }
+    let processStalledJob (job:Job<'a>) = 
+        async { 
+            let! lock = job.takeLock token
+            match lock with
+            | true -> 
+                let key = this.toKey("completed");
+                let! contains = this.client.SetContainsAsync (key, job.jobId |> toValueI64) |> Async.AwaitTask
+                if contains then 
+                    do! processJob(job)
+            | false -> ()
+        }
+    let processStalledJobs () = 
         async {
             let! range = db.ListRangeAsync (this.toKey ("active"), 0L, -1L) |> Async.AwaitTask
             let jobs = 
