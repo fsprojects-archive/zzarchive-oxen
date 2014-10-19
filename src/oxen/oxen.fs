@@ -62,15 +62,24 @@ type Job<'a> =
                 ) |> Async.AwaitTask
         }
     member this.renewLock token = this.takeLock (token, true)
-    member this.releaseLock token =
-        let script = @"
-            if redis.call("get", KEYS[1]) == ARGV[1] \n
-            then \n
-            return redis.call("del", KEYS[1]) \n
-            else \n
-            return 0 \n
-            end \n" 
-        this.queue.client.ScriptEvaluateAsync ()
+    member this.releaseLock (token):Async<int> = async {
+        let script = 
+            "if redis.call(\"get\", KEYS[1]) == ARGV[1] \n\
+            then \n\
+            return redis.call(\"del\", KEYS[1]) \n\
+            else \n\
+            return 0 \n\
+            end \n"
+
+        let! result = 
+            this.queue.client.ScriptEvaluateAsync (
+                script, 
+                [|this.lockKey()|], 
+                [|(token.ToString ()) |> toValueStr|]
+             ) |> Async.AwaitTask
+        return result |> RedisResult.op_Explicit
+    }
+ 
     static member create (queue, jobId, data:'a, opts) = 
         async { 
             let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0 }
