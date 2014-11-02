@@ -26,6 +26,13 @@ module Async =
  
     let inline startAsPlainTask (work : Async<unit>) = Task.Factory.StartNew(fun () -> work |> Async.RunSynchronously)
 
+type EventType = 
+    | Completed
+    | Progress
+    | Failed
+    | Paused
+    | Resumed
+
 type Job<'a> = 
     {
         queue: Queue<'a>
@@ -165,11 +172,11 @@ and Queue<'a> (name, db:IDatabase) as this =
     member x.getJob (id:string) = async { raise (NotImplementedException ()) }
 
     //Events
-    member x.on = 
+    member x.on =  
         [
-            ("completed", event.Publish)
-            ("progress", event.Publish)
-            ("failed", event.Publish)
-            ("paused", event.Publish)
-            ("resumed", event.Publish)
-        ]
+            (Completed, event.Publish)
+            (Progress, event.Publish)
+            (Failed, event.Publish)
+            (Paused, event.Publish)
+            (Resumed, event.Publish)
+        ] |> Map.ofList
