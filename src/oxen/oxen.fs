@@ -24,7 +24,8 @@ module Async =
             | arg -> ()
         task.ContinueWith continuation |> Async.AwaitTask
  
-    let inline startAsPlainTask (work : Async<unit>) = Task.Factory.StartNew(fun () -> work |> Async.RunSynchronously)
+    let inline startAsPlainTask (work : Async<unit>) = 
+        Task.Factory.StartNew(fun () -> work |> Async.RunSynchronously)
 
 type EventType = 
     | Completed
@@ -54,7 +55,10 @@ type Job<'a> =
     member this.progress progress = 
         async {
             let client:IDatabase = this.queue.client
-            do! client.HashSetAsync(this.queue.toKey(this.jobId.ToString ()), [| HashEntry (toValueStr "progress", toValueI32 progress) |]) |> Async.awaitPlainTask
+            do! client.HashSetAsync (
+                    this.queue.toKey(this.jobId.ToString ()), 
+                    [| HashEntry (toValueStr "progress", toValueI32 progress) |]
+                ) |> Async.awaitPlainTask
             do! this.queue.emit(EventType.Progress, this, progress)
         }
     member this.remove () = async { raise (NotImplementedException ()) }
@@ -97,7 +101,9 @@ type Job<'a> =
             let dest = queue.toKey(set)
             let client:IDatabase = queue.client
             let multi = client.CreateTransaction()
-            do! multi.ListRemoveAsync (activeList, toValueI64 this.jobId) |> Async.AwaitTask |> Async.Ignore
+            do! multi.ListRemoveAsync (activeList, toValueI64 this.jobId) 
+                |> Async.AwaitTask 
+                |> Async.Ignore
             do! multi.SetAddAsync (dest, toValueI64 this.jobId) |> Async.AwaitTask |> Async.Ignore
             return! multi.ExecuteAsync() |> Async.AwaitTask                       
         }
@@ -123,7 +129,12 @@ type Job<'a> =
             let client = queue.client
             let! job = client.HashGetAllAsync (jobId) |> Async.AwaitTask
             //staan hash values altijd op dezelfde volgorde
-            return Job.fromData (queue, job.[0].Value |> fromValueI64, job.[1].Value |> fromValueStr, job.[2].Value |> fromValueStr, job.[3].Value |> fromValueI32) 
+            return Job.fromData (
+                queue, 
+                job.[0].Value |> fromValueI64, 
+                job.[1].Value |> fromValueStr, 
+                job.[2].Value |> fromValueStr, 
+                job.[3].Value |> fromValueI32) 
         }
     static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int) =
         let sData = JsonConvert.DeserializeObject<'a>(data)
@@ -168,7 +179,9 @@ and Queue<'a> (name, db:IDatabase) as this =
             match lock with
             | true -> 
                 let key = this.toKey("completed");
-                let! contains = this.client.SetContainsAsync (key, job.jobId |> toValueI64) |> Async.AwaitTask
+                let! contains = 
+                    this.client.SetContainsAsync (key, job.jobId |> toValueI64) 
+                    |> Async.AwaitTask
                 if contains then 
                     do! processJob(job)
             | false -> ()
