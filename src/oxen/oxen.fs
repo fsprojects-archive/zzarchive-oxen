@@ -51,9 +51,13 @@ type Job<'a> =
             HashEntry(toValueStr "opts", toValueStr jsOpts)
             HashEntry(toValueStr "progress", toValueI32 this._progress)
         |]
-
+    member this.progress progress = 
+        async {
+            let client:IDatabase = this.queue.client
+            do! client.HashSetAsync(this.queue.toKey(this.jobId.ToString ()), [| HashEntry (toValueStr "progress", toValueI32 progress) |]) |> Async.awaitPlainTask
+            do! this.queue.emit(EventType.Progress, this, progress)
+        }
     member this.remove () = async { raise (NotImplementedException ()) }
-    member this.progress cnt = async { raise (NotImplementedException ()) }
     member this.takeLock (token, ?renew) = async {
             let nx = match renew with 
                      | Some x -> When.NotExists
@@ -86,7 +90,27 @@ type Job<'a> =
              ) |> Async.AwaitTask
         return result |> RedisResult.op_Explicit
     }
- 
+    member private this.moveToSet set =
+        async {
+            let queue = this.queue
+            let activeList = queue.toKey("active")
+            let dest = queue.toKey(set)
+            let client:IDatabase = queue.client
+            let multi = client.CreateTransaction()
+            do! multi.ListRemoveAsync (activeList, toValueI64 this.jobId) |> Async.AwaitTask |> Async.Ignore
+            do! multi.SetAddAsync (dest, toValueI64 this.jobId) |> Async.AwaitTask |> Async.Ignore
+            return! multi.ExecuteAsync() |> Async.AwaitTask                       
+        }
+    member private this.isDone list =
+        async {
+            let client:IDatabase = this.queue.client
+            return! client.SetContainsAsync(this.queue.toKey(list), toValueI64 this.jobId) |> Async.AwaitTask
+        }
+    member this.moveToCompleted () = this.moveToSet("completed")
+    member this.moveToFailed () = this.moveToSet("failed")
+    member this.isCompleted = this.isDone("completed");
+    member this.isFailed = this.isDone("failed");
+    
     static member create (queue, jobId, data:'a, opts) = 
         async { 
             let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0 }
@@ -113,9 +137,23 @@ and OxenEvent<'a> =
         err: exn option
     }
 
+and EventSource<'a> = {
+    Completed: IEvent<OxenEvent<'a>>
+    Progress: IEvent<OxenEvent<'a>>
+    Failed: IEvent<OxenEvent<'a>>
+    Paused: IEvent<OxenEvent<'a>>
+    Resumed: IEvent<OxenEvent<'a>>
+}
+
 and Queue<'a> (name, db:IDatabase) as this =
     let token = Guid.NewGuid ()
-    let event = new Event<OxenEvent<'a>> ()
+    
+    let completedEvent = new Event<OxenEvent<'a>> ()
+    let progressEvent = new Event<OxenEvent<'a>> ()
+    let failedEvent = new Event<OxenEvent<'a>> ()
+    let pausedEvent = new Event<OxenEvent<'a>> ()
+    let resumedEvent = new Event<OxenEvent<'a>> ()
+
     let processJob job = async { 
             // if paused then return else
             // processing <- true; job.renewLock(); renewlocktimeout <- settimeout;
@@ -145,7 +183,15 @@ and Queue<'a> (name, db:IDatabase) as this =
                 |> Seq.map (fun x -> Job.fromId (this, x))
             return! jobs |> Async.Parallel
         }
-
+    member internal x.emit (eventType, job:Job<'a>, ?value) = 
+        async {
+            progressEvent.Trigger(
+                {
+                    job = Some job
+                    progress = value
+                    err = None
+                })
+        }
     member x.toKey (kind:string) = RedisKey.op_Implicit ("bull:" + name + ":" + kind)
     member x.client = db
     member x.process (handler:(Job<'a> * unit -> unit) -> unit) = () //process is reserved for future use
@@ -172,11 +218,10 @@ and Queue<'a> (name, db:IDatabase) as this =
     member x.getJob (id:string) = async { raise (NotImplementedException ()) }
 
     //Events
-    member x.on =  
-        [
-            (Completed, event.Publish)
-            (Progress, event.Publish)
-            (Failed, event.Publish)
-            (Paused, event.Publish)
-            (Resumed, event.Publish)
-        ] |> Map.ofList
+    member x.on = { 
+        Completed = completedEvent.Publish
+        Progress = progressEvent.Publish
+        Failed = failedEvent.Publish
+        Paused = pausedEvent.Publish
+        Resumed = resumedEvent.Publish
+    }

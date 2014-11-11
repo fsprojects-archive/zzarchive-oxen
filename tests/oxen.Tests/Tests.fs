@@ -15,6 +15,7 @@ type Data = {
 let taskHash = Task.Factory.StartNew(fun () -> ())
 let taskIncr = Task.Factory.StartNew(fun () -> 1L)
 let taskLPush = Task.Factory.StartNew(fun () -> 1L)
+let taskLong = Task.Factory.StartNew(fun () -> 1L)
 let taskTrue = Task.Factory.StartNew(fun () -> true)
 let taskJobHash = Task.Factory.StartNew(fun () -> 
     [|
@@ -43,7 +44,7 @@ type JobFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d ->
             <@
-                d.HashGetAllAsync ((any ()), (any ())) --> taskJobHash
+                d.HashGetAllAsync (any(), any()) --> taskJobHash
             @>
         )
 
@@ -63,7 +64,7 @@ type JobFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d ->
             <@
-                d.StringSetAsync ((any ()), (any ()), (any ()), (any ())) --> taskTrue
+                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue
             @>
         )
         
@@ -81,7 +82,7 @@ type JobFixture () =
 
         // Then
         taken |> should be True
-        verify <@ db.StringSetAsync ((any()), (any()), (any()), (any())) @> once
+        verify <@ db.StringSetAsync (any(), any(), any(), any()) @> once
 
     
     [<Fact>]
@@ -89,7 +90,7 @@ type JobFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d ->
             <@
-                d.StringSetAsync ((any ()), (any ()), (any ()), (any ())) --> taskTrue
+                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue
             @>
         )
                 
@@ -107,7 +108,43 @@ type JobFixture () =
 
         // Then
         taken |> should be True
-        verify <@ db.StringSetAsync ((any()), (any()), (any()), When.NotExists) @> once
+        verify <@ db.StringSetAsync (any(), any(), any(), When.NotExists) @> once
+
+    [<Fact>]
+    let ``should be able to move job to completed`` () = 
+        async {
+            // Given
+            let trans = Mock<ITransaction>.With(fun t ->
+                <@
+                    t.ListRemoveAsync (any(), any(), any(), any()) --> taskLong
+                    t.SetAddAsync (any(), (any():RedisValue), any()) --> taskTrue
+                    t.ExecuteAsync () --> taskTrue
+                @>
+            )
+
+            let db = Mock<IDatabase>.With(fun d -> 
+                <@ 
+                    d.HashSetAsync(any(), any()) --> taskHash
+                    d.StringIncrementAsync(any()) --> taskIncr
+                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
+                    d.CreateTransaction() --> trans
+                @>
+            )
+            let queue = Queue<Data> ("test", db)
+            let! job = Job<Data>.create(queue, 1L, { value = "test" }, None)
+            
+            // When
+            let! result = job.moveToCompleted() 
+
+            // Then
+            result |> should be True
+            verify <@ trans.ExecuteAsync () @> once
+            verify <@ trans.ListRemoveAsync (any(), any(), any(), any()) @> once
+            verify <@ trans.SetAddAsync (any(), (any():RedisValue), any()) @> once
+            verify <@ db.CreateTransaction () @> once
+            ()
+        } |> Async.RunSynchronously
+
 
 type QueueFixture () =
 
@@ -117,7 +154,7 @@ type QueueFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d -> 
             <@ 
-                d.HashSetAsync((any()), (any())) --> taskHash
+                d.HashSetAsync(any(), any()) --> taskHash
                 d.StringIncrementAsync(any()) --> taskIncr
                 d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
             @>
@@ -145,6 +182,37 @@ type QueueFixture () =
 
         // Then
         result |> should equal "bull:test:stuff"
+
+    [<Fact>]
+    let ``report progress and listen to event on queue`` () =
+        async {
+            // Given 
+            let db = Mock<IDatabase>.With(fun d -> 
+                <@ 
+                    d.HashSetAsync(any(), any()) --> taskHash
+                    d.StringIncrementAsync(any()) --> taskIncr
+                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
+                @>
+            )
+
+            let queue = Queue<Data> ("test", db)
+            let! job = queue.add({ value = "test" })
+            let eventFired = ref false
+            queue.on.Progress.Add(
+                fun e -> 
+                    eventFired := true
+                    match e.progress with 
+                    | Some x -> x |> should equal 100
+                    | None -> failwith "progress should not be null"
+            )
+
+            // When
+            do! job.progress 100
+        
+            // Then 
+            !eventFired |> should be True
+            verify <@ db.ListLeftPushAsync(any(), any(), any(), any()) @> once
+        } |> Async.RunSynchronously     
 
 
 //type vl = {id:string; status:string}
