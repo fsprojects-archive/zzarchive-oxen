@@ -148,7 +148,7 @@ and OxenEvent<'a> =
         err: exn option
     }
 
-and EventSource<'a> = {
+and Events<'a> = {
     Completed: IEvent<OxenEvent<'a>>
     Progress: IEvent<OxenEvent<'a>>
     Failed: IEvent<OxenEvent<'a>>
