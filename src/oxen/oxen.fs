@@ -198,12 +198,16 @@ and Queue<'a> (name, db:IDatabase) as this =
         }
     member internal x.emit (eventType, job:Job<'a>, ?value) = 
         async {
-            progressEvent.Trigger(
+            let eventData = 
                 {
                     job = Some job
                     progress = value
                     err = None
-                })
+                }
+            
+            match eventType with 
+            | Progress -> progressEvent.Trigger(eventData)
+            | _ -> failwith "It'sNotYetBeenImplemented"
         }
     member x.toKey (kind:string) = RedisKey.op_Implicit ("bull:" + name + ":" + kind)
     member x.client = db
