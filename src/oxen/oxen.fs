@@ -10,9 +10,12 @@ module OxenConvenience =
     let toValueStr (x:string) = RedisValue.op_Implicit(x:string)
     let toValueI64 (x:int64) = RedisValue.op_Implicit(x:int64)
     let toValueI32 (x:int32) = RedisValue.op_Implicit(x:int32)
-    let fromValueStr (x:RedisValue):string = RedisValue.op_Implicit (x)
-    let fromValueI64 (x:RedisValue):int64 = Int64.Parse (RedisValue.op_Implicit (x))
-    let fromValueI32 (x:RedisValue):int = Int32.Parse (RedisValue.op_Implicit (x))
+    let fromValueStr (x:RedisValue):string = string(x)
+    let fromValueI64 (x:RedisValue):int64 = int64(x)
+    let fromValueI32 (x:RedisValue):int = int(x)
+    let valueToKeyLong (x:RedisValue):RedisKey = RedisKey.op_Implicit(int64(x).ToString ())
+    let (|?) (x: 'a option) (y: 'a) =  match x with | None -> y | Some z -> z
+
     let LOCK_RENEW_TIME = 5000.0
 
 module Async =
@@ -104,6 +107,7 @@ type Job<'a> =
             do! multi.ListRemoveAsync (activeList, toValueI64 this.jobId) 
                 |> Async.AwaitTask 
                 |> Async.Ignore
+
             do! multi.SetAddAsync (dest, toValueI64 this.jobId) |> Async.AwaitTask |> Async.Ignore
             return! multi.ExecuteAsync() |> Async.AwaitTask                       
         }
@@ -232,8 +236,26 @@ and Queue<'a> (name, db:IDatabase) as this =
     member x.resume () = async { raise (NotImplementedException ()) }
     member x.count () = async { raise (NotImplementedException ()) }
     member x.empty () = async { raise (NotImplementedException ()) }
-    member x.getJob (id:string) = async { raise (NotImplementedException ()) }
+    member x.getJob id = Job<'a>.fromId (this, id)
+    member x.getJobs (queueType, ?isList, ?start, ?stop) =
+        async {
+            let key = this.toKey(queueType)
+            let! jobsIds = 
+                match isList |? false with 
+                | true -> this.client.ListRangeAsync(key, (start |? 0L), (stop |? -1L)) |> Async.AwaitTask
+                | false -> this.client.SetMembersAsync(key) |> Async.AwaitTask
 
+            return!
+                jobsIds
+                |> Seq.map valueToKeyLong
+                |> Seq.map this.getJob
+                |> Async.Parallel
+        }
+    member x.getFailed () = this.getJobs "failed"
+    member x.getCompleted () = this.getJobs "completed"
+    member x.getWaiting () = this.getJobs "wait", true
+    member x.getActive () = this.getJobs "active", true
+        
     //Events
     member x.on = { 
         Completed = completedEvent.Publish

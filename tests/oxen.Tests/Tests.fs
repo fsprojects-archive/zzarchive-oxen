@@ -12,18 +12,20 @@ type Data = {
     value: string
 }
 
-let taskHash = Task.Factory.StartNew(fun () -> ())
-let taskIncr = Task.Factory.StartNew(fun () -> 1L)
-let taskLPush = Task.Factory.StartNew(fun () -> 1L)
-let taskLong = Task.Factory.StartNew(fun () -> 1L)
-let taskTrue = Task.Factory.StartNew(fun () -> true)
-let taskJobHash = Task.Factory.StartNew(fun () -> 
+let taskUnit () = Task.Factory.StartNew(fun () -> ())
+let taskIncr () = Task.Factory.StartNew(fun () -> 1L)
+let taskLPush () = Task.Factory.StartNew(fun () -> 1L)
+let taskLong () = Task.Factory.StartNew(fun () -> 1L)
+let taskTrue () = Task.Factory.StartNew(fun () -> true)
+let taskJobHash () = Task.Factory.StartNew(fun () -> 
     [|
         HashEntry(toValueStr "id", toValueI64 1L)
         HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "opts", toValueStr "")
         HashEntry(toValueStr "progress", toValueI32 1)
     |])
+
+let taskValues (value:int64) = Task.Factory.StartNew(fun () -> [| RedisValue.op_Implicit(value) |])
 
 type JobFixture () = 
     [<Fact>]
@@ -44,7 +46,7 @@ type JobFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d ->
             <@
-                d.HashGetAllAsync (any(), any()) --> taskJobHash
+                d.HashGetAllAsync (any(), any()) --> taskJobHash()
             @>
         )
 
@@ -64,7 +66,7 @@ type JobFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d ->
             <@
-                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue
+                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue()
             @>
         )
         
@@ -90,7 +92,7 @@ type JobFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d ->
             <@
-                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue
+                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue()
             @>
         )
                 
@@ -116,17 +118,17 @@ type JobFixture () =
             // Given
             let trans = Mock<ITransaction>.With(fun t ->
                 <@
-                    t.ListRemoveAsync (any(), any(), any(), any()) --> taskLong
-                    t.SetAddAsync (any(), (any():RedisValue), any()) --> taskTrue
-                    t.ExecuteAsync () --> taskTrue
+                    t.ListRemoveAsync (any(), any(), any(), any()) --> taskLong()
+                    t.SetAddAsync (any(), (any():RedisValue), any()) --> taskTrue()
+                    t.ExecuteAsync () --> taskTrue()
                 @>
             )
 
             let db = Mock<IDatabase>.With(fun d -> 
                 <@ 
-                    d.HashSetAsync(any(), any()) --> taskHash
-                    d.StringIncrementAsync(any()) --> taskIncr
-                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
+                    d.HashSetAsync(any(), any()) --> taskUnit()
+                    d.StringIncrementAsync(any()) --> taskIncr()
+                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
                     d.CreateTransaction() --> trans
                 @>
             )
@@ -154,9 +156,9 @@ type QueueFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d -> 
             <@ 
-                d.HashSetAsync(any(), any()) --> taskHash
-                d.StringIncrementAsync(any()) --> taskIncr
-                d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
+                d.HashSetAsync(any(), any()) --> taskUnit()
+                d.StringIncrementAsync(any()) --> taskIncr()
+                d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
             @>
         )
         let queue = Queue ("test", db)
@@ -189,9 +191,9 @@ type QueueFixture () =
             // Given 
             let db = Mock<IDatabase>.With(fun d -> 
                 <@ 
-                    d.HashSetAsync(any(), any()) --> taskHash
-                    d.StringIncrementAsync(any()) --> taskIncr
-                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
+                    d.HashSetAsync(any(), any()) --> taskUnit()
+                    d.StringIncrementAsync(any()) --> taskIncr()
+                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
                 @>
             )
 
@@ -212,24 +214,47 @@ type QueueFixture () =
             // Then 
             !eventFired |> should be True
             verify <@ db.ListLeftPushAsync(any(), any(), any(), any()) @> once
-        } |> Async.RunSynchronously     
+        } |> Async.RunSynchronously    
+        
+    [<Fact>]
+    let ``should be able to get failed jobs`` () = 
+        async {
+            // Given
+            let trans = Mock<ITransaction>.With(fun t ->
+                <@
+                    t.ListRemoveAsync (any(), any(), any(), any()) --> taskLong()
+                    t.SetAddAsync (any(), (any():RedisValue), any()) --> taskTrue()
+                    t.ExecuteAsync () --> taskTrue()
+                @>
+            )
 
+            let db = Mock<IDatabase>.With(fun d -> 
+                <@ 
+                    d.HashSetAsync(any(), any()) --> taskUnit()
+                    d.StringIncrementAsync(any()) --> taskIncr()
+                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
+                    d.CreateTransaction() --> trans
+                    d.SetMembersAsync(any()) --> taskValues(1L)
+                    d.HashGetAllAsync(any()) --> taskJobHash()
+                @>
+            )
 
-//type vl = {id:string; status:string}
-//let redis = ConnectionMultiplexer.Connect("curittest.redis.cache.windows.net:6379,password=T/ncgOLWjN8DlIz3g/fzG9qgdTZiN+n2b4QCNQv3PzQ=")  
-//let queue = Queue ("vragenlijstsessies", redis)
-//queue.add({id = "TMART^SLAAP_V^1467^4522^C9[21PR899"; status = "klaar"}, None) |> Async.RunSynchronously |> ignore
+            let queue = Queue<Data> ("test", db)
+            let! job = queue.add({ value = "test" });
 
-// bulljs api
-// Queue constructor Queue(naam, port, ip, { other node_redis options })
-// queue.process(function(job, done){})
-// queue.add(job, opts) opts.lifo opts{} returns promise
-// queue.pause().then(function(){})
-// queue.resume().then(function (){})
-// queue.on(completed/failed/progress/paused/resumed)
-// queue.count() returns promise
-// queue.empty() returns promise
-// queue.getJob(id) returns promise
-// job.remove() returns promise
+            //When
+            do! job.moveToFailed() |> Async.Ignore
+            let! jobs = queue.getFailed() 
 
+            //Then
+            (jobs |> Seq.head).data.value |> should equal "test"
 
+            let value = toValueI64 1L
+            let key = queue.toKey("failed")
+            verify <@ db.ListLeftPushAsync(any(), value) @> once
+            verify <@ trans.ListRemoveAsync(any(), any(), any(), any()) @> once
+            verify <@ trans.SetAddAsync(any(), value, any()) @> once
+            verify <@ db.SetMembersAsync(key) @> once
+            verify <@ db.HashGetAllAsync(any()) @> once
+             
+        } |> Async.RunSynchronously
