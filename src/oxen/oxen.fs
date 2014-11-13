@@ -107,6 +107,7 @@ type Job<'a> =
             do! multi.ListRemoveAsync (activeList, toValueI64 this.jobId) 
                 |> Async.AwaitTask 
                 |> Async.Ignore
+
             do! multi.SetAddAsync (dest, toValueI64 this.jobId) |> Async.AwaitTask |> Async.Ignore
             return! multi.ExecuteAsync() |> Async.AwaitTask                       
         }
@@ -238,7 +239,7 @@ and Queue<'a> (name, db:IDatabase) as this =
     member x.getJob id = Job<'a>.fromId (this, id)
     member x.getJobs (queueType, ?isList, ?start, ?stop) =
         async {
-            let key = this.toKey("queueType")
+            let key = this.toKey(queueType)
             let! jobsIds = 
                 match isList |? false with 
                 | true -> this.client.ListRangeAsync(key, (start |? 0L), (stop |? -1L)) |> Async.AwaitTask

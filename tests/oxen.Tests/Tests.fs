@@ -12,18 +12,20 @@ type Data = {
     value: string
 }
 
-let taskUnit = Task.Factory.StartNew(fun () -> ())
-let taskIncr = Task.Factory.StartNew(fun () -> 1L)
-let taskLPush = Task.Factory.StartNew(fun () -> 1L)
-let taskLong = Task.Factory.StartNew(fun () -> 1L)
-let taskTrue = Task.Factory.StartNew(fun () -> true)
-let taskJobHash = Task.Factory.StartNew(fun () -> 
+let taskUnit () = Task.Factory.StartNew(fun () -> ())
+let taskIncr () = Task.Factory.StartNew(fun () -> 1L)
+let taskLPush () = Task.Factory.StartNew(fun () -> 1L)
+let taskLong () = Task.Factory.StartNew(fun () -> 1L)
+let taskTrue () = Task.Factory.StartNew(fun () -> true)
+let taskJobHash () = Task.Factory.StartNew(fun () -> 
     [|
         HashEntry(toValueStr "id", toValueI64 1L)
         HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "opts", toValueStr "")
         HashEntry(toValueStr "progress", toValueI32 1)
     |])
+
+let taskValues (value:int64) = Task.Factory.StartNew(fun () -> [| RedisValue.op_Implicit(value) |])
 
 type JobFixture () = 
     [<Fact>]
@@ -44,7 +46,7 @@ type JobFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d ->
             <@
-                d.HashGetAllAsync (any(), any()) --> taskJobHash
+                d.HashGetAllAsync (any(), any()) --> taskJobHash()
             @>
         )
 
@@ -64,7 +66,7 @@ type JobFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d ->
             <@
-                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue
+                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue()
             @>
         )
         
@@ -90,7 +92,7 @@ type JobFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d ->
             <@
-                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue
+                d.StringSetAsync (any(), any(), any(), any()) --> taskTrue()
             @>
         )
                 
@@ -116,17 +118,17 @@ type JobFixture () =
             // Given
             let trans = Mock<ITransaction>.With(fun t ->
                 <@
-                    t.ListRemoveAsync (any(), any(), any(), any()) --> taskLong
-                    t.SetAddAsync (any(), (any():RedisValue), any()) --> taskTrue
-                    t.ExecuteAsync () --> taskTrue
+                    t.ListRemoveAsync (any(), any(), any(), any()) --> taskLong()
+                    t.SetAddAsync (any(), (any():RedisValue), any()) --> taskTrue()
+                    t.ExecuteAsync () --> taskTrue()
                 @>
             )
 
             let db = Mock<IDatabase>.With(fun d -> 
                 <@ 
-                    d.HashSetAsync(any(), any()) --> taskUnit
-                    d.StringIncrementAsync(any()) --> taskIncr
-                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
+                    d.HashSetAsync(any(), any()) --> taskUnit()
+                    d.StringIncrementAsync(any()) --> taskIncr()
+                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
                     d.CreateTransaction() --> trans
                 @>
             )
@@ -154,9 +156,9 @@ type QueueFixture () =
         // Given
         let db = Mock<IDatabase>.With(fun d -> 
             <@ 
-                d.HashSetAsync(any(), any()) --> taskUnit
-                d.StringIncrementAsync(any()) --> taskIncr
-                d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
+                d.HashSetAsync(any(), any()) --> taskUnit()
+                d.StringIncrementAsync(any()) --> taskIncr()
+                d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
             @>
         )
         let queue = Queue ("test", db)
@@ -189,9 +191,9 @@ type QueueFixture () =
             // Given 
             let db = Mock<IDatabase>.With(fun d -> 
                 <@ 
-                    d.HashSetAsync(any(), any()) --> taskUnit
-                    d.StringIncrementAsync(any()) --> taskIncr
-                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
+                    d.HashSetAsync(any(), any()) --> taskUnit()
+                    d.StringIncrementAsync(any()) --> taskIncr()
+                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
                 @>
             )
 
@@ -218,11 +220,22 @@ type QueueFixture () =
     let ``should be able to get failed jobs`` () = 
         async {
             // Given
+            let trans = Mock<ITransaction>.With(fun t ->
+                <@
+                    t.ListRemoveAsync (any(), any(), any(), any()) --> taskLong()
+                    t.SetAddAsync (any(), (any():RedisValue), any()) --> taskTrue()
+                    t.ExecuteAsync () --> taskTrue()
+                @>
+            )
+
             let db = Mock<IDatabase>.With(fun d -> 
                 <@ 
-                    d.HashSetAsync(any(), any()) --> taskUnit
-                    d.StringIncrementAsync(any()) --> taskIncr
-                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush
+                    d.HashSetAsync(any(), any()) --> taskUnit()
+                    d.StringIncrementAsync(any()) --> taskIncr()
+                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
+                    d.CreateTransaction() --> trans
+                    d.SetMembersAsync(any()) --> taskValues(1L)
+                    d.HashGetAllAsync(any()) --> taskJobHash()
                 @>
             )
 
@@ -235,5 +248,13 @@ type QueueFixture () =
 
             //Then
             (jobs |> Seq.head).data.value |> should equal "test"
-            
+
+            let value = toValueI64 1L
+            let key = queue.toKey("failed")
+            verify <@ db.ListLeftPushAsync(any(), value) @> once
+            verify <@ trans.ListRemoveAsync(any(), any(), any(), any()) @> once
+            verify <@ trans.SetAddAsync(any(), value, any()) @> once
+            verify <@ db.SetMembersAsync(key) @> once
+            verify <@ db.HashGetAllAsync(any()) @> once
+             
         } |> Async.RunSynchronously
