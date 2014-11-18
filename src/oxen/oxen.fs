@@ -176,6 +176,7 @@ and Events<'a> = {
     Failed: IEvent<OxenJobEvent<'a>>
     Paused: IEvent<OxenQueueEvent<'a>>
     Resumed: IEvent<OxenQueueEvent<'a>>
+    NewJob: IEvent<OxenJobEvent<'a>>
 }
 
 and LockRenewer<'a> (job:Job<'a>) =
@@ -190,7 +191,7 @@ and LockRenewer<'a> (job:Job<'a>) =
 
     do Async.Start (lockRenewer job, cts.Token)
 
-    interface IDisposable
+    interface IDisposable with
         member x.Dispose() =
             x.Dispose(true)
             GC.SuppressFinalize(x);
@@ -207,25 +208,31 @@ and LockRenewer<'a> (job:Job<'a>) =
 /// </summary>
 /// <param name="name">Name of the queue</param>
 /// <param name="connection">Redis connectionstring</param>
-and Queue<'a> (name, multiplexer:ConnectionMultiplexer) as this =
+and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber)) as this =
     let mutable paused = false
     let mutable processing = false
 
-    let dbFactory () = multiplexer.GetDatabase()
-    let multiplexer = multiplexer
-    let sub = multiplexer.GetSubscriber()
     do async {
-        sub.SubscribeAsync(this.toChannel("jobchannel"), Action<RedisChannel, RedisValue>(fun c v -> this.emitJobEvent(NewJob, Job.fromId(this, valueToKeyLong v) |> Async.RunSynchronously) |> Async.RunSynchronously)) |> Async.awaitPlainTask |> Async.RunSynchronously
-        ()
-    } |> Async.RunSynchronously
+           do! subscriberFactory().SubscribeAsync (
+                    this.toChannel("jobchannel"),
+                    (fun c v -> 
+                        async {
+                            let! job = Job.fromId(this, valueToKeyLong v)
+                            do! this.emitJobEvent(NewJob, job)
+                            ()
+                        } |> Async.RunSynchronously)) |> Async.awaitPlainTask
+               
+           ()
+       } |> Async.RunSynchronously
 
     let token = Guid.NewGuid ()
+
     let completedEvent = new Event<OxenJobEvent<'a>> ()
     let progressEvent = new Event<OxenJobEvent<'a>> ()
     let failedEvent = new Event<OxenJobEvent<'a>> ()
     let pausedEvent = new Event<OxenQueueEvent<'a>> ()
     let resumedEvent = new Event<OxenQueueEvent<'a>> ()
-    let newJobEvent = new Event<OxenQueueEvent<'a>> ()
+    let newJobEvent = new Event<OxenJobEvent<'a>> ()
 
     let once s = async { () }
 
@@ -246,10 +253,23 @@ and Queue<'a> (name, multiplexer:ConnectionMultiplexer) as this =
                     do! this.emitJobEvent(Failed, job, exn = e) 
         }
 
-    let processJobs handler = 
+    let rec getNextJob () =
         async {
+            do! this.on.NewJob |> Async.AwaitEvent |> Async.Ignore
+            let! (gotIt:RedisValue) = this.moveJob(this.toKey("wait"), this.toKey("active")) 
+                
+            return! 
+                match gotIt with 
+                | g when g.HasValue ->this.getJob (valueToKeyLong g)
+                | _ -> getNextJob ()
+        }
 
-
+    let rec processJobs handler = 
+        async {
+            let! job = getNextJob ()
+            do! processJob handler job
+            if not(paused) then 
+                do! processJobs handler
         }
 
     let processStalledJob handler (job:Job<'a>) = 
@@ -280,18 +300,18 @@ and Queue<'a> (name, multiplexer:ConnectionMultiplexer) as this =
 
             let stalledJobsHandler = processStalledJob handler
 
-            return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel
+            return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel |> Async.Ignore
         } 
 
-    member x.``process`` (handler:(Job<'a> * unit -> unit) -> unit) = 
-        ()
+    member x.``process`` (handler:Job<'a> -> Async<unit>) = 
+        async {
+            do! this.run handler
+        }
     
     member x.run handler = 
         async {
-            let jobHandler = processJob handler
-            let! stalledJobs = processStalledJobs handler
-            do! stalledJobs |> Seq.map jobHandler
-            ()
+            do! processStalledJobs handler
+            do! processJobs handler
         }
     
     member x.add (data, ?opts:Map<string,string>) = 
@@ -307,6 +327,8 @@ and Queue<'a> (name, multiplexer:ConnectionMultiplexer) as this =
                     if opts.ContainsKey "lifo" && bool.Parse (opts.Item "lifo") 
                     then this.client().ListRightPushAsync (key, toValueI64 jobId) 
                     else this.client().ListLeftPushAsync (key, toValueI64 jobId) 
+
+            do! this.emitJobEvent(NewJob, job)
 
             return job
         }
@@ -324,9 +346,39 @@ and Queue<'a> (name, multiplexer:ConnectionMultiplexer) as this =
                 return paused
         }
         
-    member x.resume () = async { raise (NotImplementedException ()) }
-    member x.count () = async { raise (NotImplementedException ()) }
-    member x.empty () = async { raise (NotImplementedException ()) }
+    member x.resume handler = 
+        async { 
+            if paused then
+                paused <- false
+                do! this.emitQueueEvent(Resumed, this)
+                do! this.run handler
+            else
+                failwith "Cannot resume running queue"
+        }
+
+    member x.count () = 
+        async { 
+            let multi = (this.client ()).CreateTransaction()
+            let! waitLength = multi.ListLengthAsync (this.toKey("wait")) |> Async.AwaitTask
+            let! pausedLength = multi.ListLengthAsync (this.toKey("paused")) |> Async.AwaitTask
+            do! multi.ExecuteAsync () |> Async.AwaitTask |> Async.Ignore
+            return [| waitLength; pausedLength; |] |> Seq.max
+        }
+    
+    member x.empty () = 
+        async { 
+            let multi = (this.client ()).CreateTransaction()
+            let! waiting = multi.ListRangeAsync (this.toKey("wait"), 0L, -1L) |> Async.AwaitTask
+            let! paused = multi.ListRangeAsync (this.toKey("paused"), 0L, -1L) |> Async.AwaitTask
+            do! multi.KeyDeleteAsync(this.toKey("wait")) |> Async.AwaitTask |> Async.Ignore
+            do! multi.KeyDeleteAsync(this.toKey("paused")) |> Async.AwaitTask |> Async.Ignore
+            do! multi.ExecuteAsync() |>  Async.AwaitTask |> Async.Ignore
+            
+            let jobKeys = Array.concat [|waiting; paused|]
+            let multi2 = (this.client ()).CreateTransaction()
+            jobKeys |> Seq.iter (fun k -> multi2.KeyDeleteAsync(valueToKeyLong k) |> Async.AwaitTask |> Async.RunSynchronously |> ignore)
+            return! multi2.ExecuteAsync () |> Async.AwaitTask
+        }
 
     member x.moveJob (src, dest) = this.client().ListRightPopLeftPushAsync(src, dest) |> Async.AwaitTask
     member x.getJob id = Job<'a>.fromId (this, id)
@@ -351,11 +403,12 @@ and Queue<'a> (name, multiplexer:ConnectionMultiplexer) as this =
         
     //Events
     member x.on = { 
+        Paused = pausedEvent.Publish
+        Resumed = resumedEvent.Publish
         Completed = completedEvent.Publish
         Progress = progressEvent.Publish
         Failed = failedEvent.Publish
-        Paused = pausedEvent.Publish
-        Resumed = resumedEvent.Publish
+        NewJob = newJobEvent.Publish
     }
 
     //Internals
@@ -379,7 +432,10 @@ and Queue<'a> (name, multiplexer:ConnectionMultiplexer) as this =
                 }
             
             match eventType with 
+            | Completed -> completedEvent.Trigger(eventData)
             | Progress -> progressEvent.Trigger(eventData)
-            | _ -> failwith "It'sNotYetBeenImplemented"
+            | Failed -> failedEvent.Trigger(eventData)
+            | NewJob -> newJobEvent.Trigger(eventData)
+            | _ -> failwith "Not a job event!"
         }
     member internal x.client = dbFactory

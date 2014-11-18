@@ -49,8 +49,9 @@ type JobFixture () =
                 d.HashGetAllAsync (any(), any()) --> taskJobHash()
             @>
         )
+        let sub = Mock<ISubscriber>().Create();
 
-        let q = Queue<Data>("stuff", db)
+        let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
         let key:RedisKey = RedisKey.op_Implicit("1")
 
         // When 
@@ -69,8 +70,9 @@ type JobFixture () =
                 d.StringSetAsync (any(), any(), any(), any()) --> taskTrue()
             @>
         )
-        
-        let q = Queue<Data>("test", db);
+        let sub = Mock<ISubscriber>().Create();
+
+        let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
         let job = {
             jobId = 1L
             queue = q
@@ -95,8 +97,9 @@ type JobFixture () =
                 d.StringSetAsync (any(), any(), any(), any()) --> taskTrue()
             @>
         )
-                
-        let q = Queue<Data>("test", db);
+        let sub = Mock<ISubscriber>().Create();
+
+        let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
         let job = {
             jobId = 1L
             queue = q
@@ -132,8 +135,10 @@ type JobFixture () =
                     d.CreateTransaction() --> trans
                 @>
             )
-            let queue = Queue<Data> ("test", db)
-            let! job = Job<Data>.create(queue, 1L, { value = "test" }, None)
+            let sub = Mock<ISubscriber>().Create();
+
+            let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
+            let! job = Job<Data>.create(q, 1L, { value = "test" }, None)
             
             // When
             let! result = job.moveToCompleted() 
@@ -149,7 +154,6 @@ type JobFixture () =
 
 
 type QueueFixture () =
-
     [<Fact>]
     let ``should be able to add a job to the queue`` () =
   
@@ -161,7 +165,9 @@ type QueueFixture () =
                 d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
             @>
         )
-        let queue = Queue ("test", db)
+        let sub = Mock<ISubscriber>().Create();
+
+        let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
         // When
         let job = queue.add ({value = "test"}) |> Async.RunSynchronously
@@ -177,8 +183,10 @@ type QueueFixture () =
     let ``toKey should return a key that works with bull`` () = 
         // Given
         let db = Mock<IDatabase>().Create();
-        let queue = Queue ("test", db)
+        let sub = Mock<ISubscriber>().Create();
 
+        let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
+        
         // When
         let result = queue.toKey("stuff")
 
@@ -196,8 +204,10 @@ type QueueFixture () =
                     d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
                 @>
             )
+            let sub = Mock<ISubscriber>().Create();
 
-            let queue = Queue<Data> ("test", db)
+            let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
+            
             let! job = queue.add({ value = "test" })
             let eventFired = ref false
             queue.on.Progress.Add(
@@ -238,8 +248,9 @@ type QueueFixture () =
                     d.HashGetAllAsync(any()) --> taskJobHash()
                 @>
             )
+            let sub = Mock<ISubscriber>().Create();
 
-            let queue = Queue<Data> ("test", db)
+            let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
             let! job = queue.add({ value = "test" });
 
             //When
@@ -258,3 +269,4 @@ type QueueFixture () =
             verify <@ db.HashGetAllAsync(any()) @> once
              
         } |> Async.RunSynchronously
+

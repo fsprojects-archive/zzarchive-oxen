@@ -62,6 +62,7 @@
     <Content Include="app.config" />
     <Content Include="packages.config" />
     <Compile Include="oxen.fs" />
+    <Compile Include="AssemblyInfo.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
