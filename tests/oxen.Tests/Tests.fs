@@ -1,6 +1,7 @@
 module oxen.Tests
 
 open System
+open System.IO
 open oxen
 open Foq
 open StackExchange.Redis
@@ -52,10 +53,9 @@ type JobFixture () =
         let sub = Mock<ISubscriber>().Create();
 
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
-        let key:RedisKey = RedisKey.op_Implicit("1")
-
+        
         // When 
-        let job = Job.fromId(q, key) |> Async.RunSynchronously
+        let job = Job.fromId(q, 1L) |> Async.RunSynchronously
         
         // Then
         job.data.value |> should equal "test"
@@ -165,10 +165,14 @@ type QueueFixture () =
                 d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
             @>
         )
-        let sub = Mock<ISubscriber>().Create();
-
+        let sub = Mock<ISubscriber>.With(fun s ->
+            <@
+                s.PublishAsync(any(), any(), any()) --> taskLong()
+            @>
+        )
+        let eventFired = ref false
         let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
-
+        
         // When
         let job = queue.add ({value = "test"}) |> Async.RunSynchronously
     
@@ -178,7 +182,7 @@ type QueueFixture () =
         verify <@ db.HashSetAsync(any(), any()) @> once
         verify <@ db.StringIncrementAsync(any()) @> once
         verify <@ db.ListLeftPushAsync(any(), any(), any(), any()) @> once
-
+        
     [<Fact>]
     let ``toKey should return a key that works with bull`` () = 
         // Given
@@ -191,7 +195,7 @@ type QueueFixture () =
         let result = queue.toKey("stuff")
 
         // Then
-        result |> should equal "bull:test:stuff"
+        result.ToString() |> should equal "bull:stuff:stuff"
 
     [<Fact>]
     let ``report progress and listen to event on queue`` () =
@@ -204,7 +208,11 @@ type QueueFixture () =
                     d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
                 @>
             )
-            let sub = Mock<ISubscriber>().Create();
+            let sub = Mock<ISubscriber>.With(fun s ->
+                <@
+                    s.PublishAsync(any(), any(), any()) --> taskLong()
+                @>
+            )
 
             let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
             
@@ -248,7 +256,11 @@ type QueueFixture () =
                     d.HashGetAllAsync(any()) --> taskJobHash()
                 @>
             )
-            let sub = Mock<ISubscriber>().Create();
+            let sub = Mock<ISubscriber>.With(fun s ->
+                <@
+                    s.PublishAsync(any(), any(), any()) --> taskLong()
+                @>
+            )
 
             let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
             let! job = queue.add({ value = "test" });
@@ -270,3 +282,66 @@ type QueueFixture () =
              
         } |> Async.RunSynchronously
 
+    type IntegrationTests () = 
+        do log4net.Config.XmlConfigurator.ConfigureAndWatch(FileInfo("log4net.config")) |> ignore
+
+        [<Fact>]
+        let ``should call handler when a new job is added`` () = 
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true")
+            
+            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+
+            let newJob = ref false
+
+            do queue.``process`` (fun j -> async { newJob := true })
+            
+            async {
+                let! job = queue.add({value = "test"})
+                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
+                let! active = queue.getActive()
+                let! completed = queue.getCompleted()
+                !newJob |> should be True
+                (active |> Array.length) |> should equal 0
+                (completed |> Array.length) |> should equal 1
+            } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should report the correct length of the queue`` () =
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true")
+            
+            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+
+            async {
+                do! queue.add({ value = "bert1" }) |> Async.Ignore
+                do! queue.add({ value = "bert2" }) |> Async.Ignore
+                do! queue.add({ value = "bert3" }) |> Async.Ignore
+                do! queue.add({ value = "bert4" }) |> Async.Ignore
+                do! queue.add({ value = "bert5" }) |> Async.Ignore
+                do! queue.add({ value = "bert6" }) |> Async.Ignore
+                do! queue.add({ value = "bert7" }) |> Async.Ignore
+
+                let! count = queue.count ()
+                count |> should equal 7L
+            } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should be able to empty the queue`` () =
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true")
+            
+            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+
+            async {
+                do! queue.add({ value = "bert1" }) |> Async.Ignore
+                do! queue.add({ value = "bert2" }) |> Async.Ignore
+                do! queue.add({ value = "bert3" }) |> Async.Ignore
+                do! queue.add({ value = "bert4" }) |> Async.Ignore
+                do! queue.add({ value = "bert5" }) |> Async.Ignore
+                do! queue.add({ value = "bert6" }) |> Async.Ignore
+                do! queue.add({ value = "bert7" }) |> Async.Ignore
+
+                let! count = queue.count () 
+                count |> should equal 7L
+                do! queue.empty () |> Async.Ignore
+                let! empty = queue.count () 
+                empty |> should equal 0L
+            } |> Async.RunSynchronously
