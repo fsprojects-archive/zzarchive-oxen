@@ -287,7 +287,7 @@ type QueueFixture () =
 
         [<Fact>]
         let ``should call handler when a new job is added`` () = 
-            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true")
+            let mp = ConnectionMultiplexer.Connect("127.0.0.1, allowAdmin=true")
             
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
 
@@ -307,7 +307,7 @@ type QueueFixture () =
 
         [<Fact>]
         let ``should report the correct length of the queue`` () =
-            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true")
+            let mp = ConnectionMultiplexer.Connect("127.0.0.1, allowAdmin=true")
             
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
 
@@ -326,7 +326,7 @@ type QueueFixture () =
 
         [<Fact>]
         let ``should be able to empty the queue`` () =
-            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true")
+            let mp = ConnectionMultiplexer.Connect("127.0.0.1, allowAdmin=true")
             
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
 
