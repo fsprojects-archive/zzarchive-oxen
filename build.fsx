@@ -77,7 +77,8 @@ let genFSAssemblyInfo (projectPath) =
         Attribute.Product project
         Attribute.Description summary
         Attribute.Version release.AssemblyVersion
-        Attribute.FileVersion release.AssemblyVersion ]
+        Attribute.FileVersion release.AssemblyVersion
+        Attribute.InternalsVisibleTo "oxen.Tests" ]
 
 let genCSAssemblyInfo (projectPath) =
     let projectName = System.IO.Path.GetFileNameWithoutExtension(projectPath)
@@ -115,6 +116,7 @@ Target "CleanDocs" (fun _ ->
 // Build library & test project
 
 Target "Build" (fun _ ->
+    
     !! solutionFile
     |> MSBuildRelease "" "Rebuild"
     |> ignore
@@ -122,6 +124,12 @@ Target "Build" (fun _ ->
 
 // --------------------------------------------------------------------------------------
 // Run the unit tests using test runner
+
+Target "StartRedis" (fun _ ->
+    async {
+        Shell.Exec("./packages/Redis-64.2.8.17/redis-server.exe") |> ignore
+    } |> Async.Start
+)
 
 Target "RunTests" (fun _ ->
     !! testAssemblies
@@ -223,6 +231,10 @@ Target "All" DoNothing
   ==> "RestorePackages"
   ==> "AssemblyInfo"
   ==> "Build"
+  #if MONO 
+  #else
+  ==> "StartRedis"
+  #endif
   ==> "RunTests"
   //=?> ("GenerateReferenceDocs",isLocalBuild && not isMono)
   =?> ("GenerateDocs",isLocalBuild && not isMono)
