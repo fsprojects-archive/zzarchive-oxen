@@ -7,9 +7,8 @@ env:
 install:
   - wget "http://download.mono-project.com/archive/${MONO_VERSION}/macos-10-x86/MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg"
   - sudo installer -pkg "MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg" -target /
+  - brew install redis
+  - brew services start redis
 
 script: 
   - ./build.sh All
-
-services:
-  - redis-server
