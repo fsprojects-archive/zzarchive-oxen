@@ -9,7 +9,7 @@ install:
   - sudo installer -pkg "MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg" -target /
   - brew tap homebrew/boneyard
   - brew install redis
-  - brew services start redis
+  - redis-server /usr/local/etc/redis.conf &
 
 script: 
   - ./build.sh All
