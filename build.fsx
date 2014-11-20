@@ -113,7 +113,7 @@ Target "CleanDocs" (fun _ ->
 )
 
 Target "BuildStackExchangeRedis" (fun _ ->
-    Shell.Exec("git clone https://github.com/StackExchange/StackExchange.Redis.git") |> ignore
+    Shell.Exec("/usr/local/git clone https://github.com/StackExchange/StackExchange.Redis.git") |> ignore
     Shell.Exec("monobuild.bash", dir = "StackExchange.Redis") |> ignore
     "StackExchange.Redis/StackExchange.Redis/bin/mono/StackExchange.Redis.dll" 
         |> CopyFile ("packages/StackExchange.Redis.1.0.371/lib/net45/") 
