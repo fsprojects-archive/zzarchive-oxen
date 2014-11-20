@@ -247,7 +247,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let mutable paused = false
     let mutable processing = false
     
-    let channel = RedisChannel("bull:" + name + ":jobchannel", RedisChannel.PatternMode.Auto)
+    let channel = RedisChannel("bull:" + name + ":jobs", RedisChannel.PatternMode.Auto)
 
     let sub = subscriberFactory ()
     do sub.Subscribe(
