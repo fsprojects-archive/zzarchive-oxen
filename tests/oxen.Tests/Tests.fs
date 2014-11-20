@@ -18,6 +18,7 @@ let taskIncr () = Task.Factory.StartNew(fun () -> 1L)
 let taskLPush () = Task.Factory.StartNew(fun () -> 1L)
 let taskLong () = Task.Factory.StartNew(fun () -> 1L)
 let taskTrue () = Task.Factory.StartNew(fun () -> true)
+let taskFalse () = Task.Factory.StartNew(fun () -> false)
 let taskRedisResult () = Task.Factory.StartNew(fun () -> Mock<RedisResult>().Create());
 let taskJobHash () = Task.Factory.StartNew(fun () -> 
     [|
@@ -28,12 +29,17 @@ let taskJobHash () = Task.Factory.StartNew(fun () ->
     |])
 
 let taskValues (value:int64) = Task.Factory.StartNew(fun () -> [| RedisValue.op_Implicit(value) |])
+let taskEmptyValues () = Task.Factory.StartNew(fun () -> [| |])
+let taskEmptyValue () = Task.Factory.StartNew(fun () -> new RedisValue())
 
 type JobFixture () = 
     [<Fact>]
     let ``should create a new job from given json data`` () =
         // Given
-        let q = Mock<Queue<Data>>().Create()
+        let db = Mock<IDatabase>().Create();
+        let sub = Mock<ISubscriber>().Create();
+
+        let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
         // When
         let job = Job.fromData(q, 1L, "{ \"value\": \"test\" }", "", 1)
@@ -282,6 +288,33 @@ type QueueFixture () =
              
         } |> Async.RunSynchronously
 
+    [<Fact>]
+    let ``should be able to pause and resume the queue`` () =
+        // Given
+        let db = Mock<IDatabase>.With(fun d ->
+            <@
+                d.ListRangeAsync (any(),any(),any()) --> taskEmptyValues ()
+                d.SetContainsAsync (any(), any()) --> taskTrue () 
+                d.ListRightPopLeftPushAsync(any(), any(), any()) --> taskEmptyValue()
+            @>
+        )
+        let sub = Mock<ISubscriber>().Create()
+        let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
+
+        let pauseHappend = ref false
+        let resumeHappend = ref false
+
+        queue.on.Resumed.Add(fun q -> resumeHappend := true)
+        queue.on.Paused.Add(fun q -> pauseHappend := true)
+            
+        let paused = queue.pause () |> Async.RunSynchronously
+        queue.resume (fun _ -> async {()}) |> Async.RunSynchronously 
+
+        !resumeHappend |> should be True
+        !pauseHappend |> should be True
+        
+        paused |> should be True
+
     type IntegrationTests () = 
         do log4net.Config.XmlConfigurator.ConfigureAndWatch(FileInfo("log4net.config")) |> ignore
 
@@ -295,7 +328,7 @@ type QueueFixture () =
             
             async {
                 // When
-                let! job = queue.add({value = "test"})
+                do queue.add({value = "test"}) |> Async.Ignore |> Async.Start
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
                 let! active = queue.getActive()
                 let! completed = queue.getCompleted()
@@ -328,6 +361,23 @@ type QueueFixture () =
             } |> Async.RunSynchronously
 
         [<Fact>]
+        let ``should be able to release the lock on a job`` () =
+            // Given
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+
+            async {
+                // When
+                let! job = queue.add({ value = "bert1" })
+                let token = Guid.NewGuid ()
+                let! lockTaken = job.takeLock (token)
+                let! lockReleased = job.releaseLock (token)
+                lockTaken |> should be True
+                lockReleased |> should equal 1L
+                mp.GetDatabase().StringLength (job.lockKey()) |> should equal 0L
+            } |> Async.RunSynchronously
+
+        [<Fact>]
         let ``should be able to empty the queue`` () =
             // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
@@ -349,6 +399,42 @@ type QueueFixture () =
                 do! queue.empty () |> Async.Ignore
                 let! empty = queue.count () 
                 empty |> should equal 0L
+            } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should be able to fail processing a job`` () =
+            // Given
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+
+            queue.``process``(fun j -> 
+                async {
+                    if j.jobId % 2L = 0L then failwith "aaaargg it be even!"
+                })
+
+            async {
+                // When
+                let! job1 = queue.add({ value = "bert1" }) 
+                let! job2 = queue.add({ value = "bert2" }) 
+
+                do! async {
+                        let rec wait () =
+                            let waiting = queue.getWaiting() |> Async.RunSynchronously
+                            let active = queue.getActive() |> Async.RunSynchronously
+                            match waiting.Length + active.Length with
+                            | x when x > 0 -> wait ()
+                            | _ -> ()
+
+                        wait ()
+                    } 
+
+                // Then
+                let! j1c = job1.isCompleted 
+                j1c |> should be True
+                let! j2c = job2.isCompleted 
+                j2c |> should be False
+                let! j2f = job2.isFailed 
+                j2f |> should be True
             } |> Async.RunSynchronously
 
         [<Fact>]

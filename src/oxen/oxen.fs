@@ -57,10 +57,11 @@ type Job<'a> =
         opts: Map<string,string> option
         _progress: int
     }
-    member private this.logger = LogManager.getLogger()
+    static member private logger = LogManager.getLogger()
+    member private this._logger = Job<'a>.logger
     member this.lockKey () = this.queue.toKey((this.jobId.ToString ()) + ":lock")
     member this.toData () =
-        this.logger.Info "creating redis hash for %i" this.jobId  
+        this._logger.Info "creating redis hash for job %i" this.jobId  
         let jsData = JsonConvert.SerializeObject (this.data)
         let jsOpts = JsonConvert.SerializeObject (this.opts)
         [|
@@ -70,8 +71,8 @@ type Job<'a> =
             HashEntry(toValueStr "progress", toValueI32 this._progress)
         |]
     member this.progress progress = 
-        this.logger.Info "reporing progress %i for job %i" progress this.jobId
         async {
+            this._logger.Info "reporing progress %i for job %i" progress this.jobId
             let client:IDatabase = this.queue.client()
             do! client.HashSetAsync (
                     this.queue.toKey(this.jobId.ToString ()), 
@@ -81,6 +82,7 @@ type Job<'a> =
         }
     member this.remove () = 
         async { 
+            this._logger.Info "removeing job %i" this.jobId
             let script = 
                 "if (redis.call(\"SISMEMBER\", KEYS[4], ARGV[1]) == 0) and (redis.call(\"SISMEMBER\", KEYS[5], ARGV[1]) == 0) then\n\
                   redis.call(\"LREM\", KEYS[1], 0, ARGV[1])\n\
@@ -100,6 +102,7 @@ type Job<'a> =
         }
     member this.takeLock (token, ?renew) = 
         async {
+            this._logger.Info "taking lock with token %A for job %i renewed %b" token this.jobId (renew |? false)
             let nx = match renew with 
                      | Some x -> When.NotExists
                      | None -> When.Always     
@@ -114,25 +117,28 @@ type Job<'a> =
                 ) |> Async.AwaitTask
         }
     member this.renewLock token = this.takeLock (token, true)
-    member this.releaseLock (token):Async<int> = async {
-        let script = 
-            "if redis.call(\"get\", KEYS[1]) == ARGV[1] \n\
-            then \n\
-            return redis.call(\"del\", KEYS[1]) \n\
-            else \n\
-            return 0 \n\
-            end \n"
+    member this.releaseLock (token) = 
+        async {
+            this._logger.Info "releasing lock with token %A for job %i" token this.jobId
+            let script = 
+                "if redis.call(\"get\", KEYS[1]) == ARGV[1] \n\
+                then \n\
+                return redis.call(\"del\", KEYS[1]) \n\
+                else \n\
+                return 0 \n\
+                end \n"
 
-        let! result = 
-            this.queue.client().ScriptEvaluateAsync (
-                script, 
-                [|this.lockKey()|], 
-                [|(token.ToString ()) |> toValueStr|]
-             ) |> Async.AwaitTask
-        return int(result)
-    }
+            let! result = 
+                this.queue.client().ScriptEvaluateAsync (
+                    script, 
+                    [|this.lockKey()|], 
+                    [|(token.ToString ()) |> toValueStr|]
+                 ) |> Async.AwaitTask
+            return int64(result)
+        }
     member private this.moveToSet set =
         async {
+            this._logger.Info "moving job %i from active to %s" this.jobId set
             let queue = this.queue
             let activeList = queue.toKey("active")
             let dest = queue.toKey(set)
@@ -144,6 +150,7 @@ type Job<'a> =
         }
     member private this.isDone list =
         async {
+            this._logger.Info "checking if job %i is done (%s)" this.jobId list
             let client:IDatabase = this.queue.client()
             return! client.SetContainsAsync(this.queue.toKey(list), toValueI64 this.jobId) |> Async.AwaitTask
         }
@@ -154,6 +161,7 @@ type Job<'a> =
     
     static member create (queue, jobId, data:'a, opts) = 
         async { 
+            Job<_>.logger.Info "creating job for queue %s with id %i and data %A and options %A" (queue:Queue<'a>).name jobId data opts
             let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0 }
             let client:IDatabase = queue.client()
             do! client.HashSetAsync (queue.toKey (jobId.ToString ()), job.toData ()) |> Async.awaitPlainTask
@@ -161,6 +169,7 @@ type Job<'a> =
         }
     static member fromId<'a> (queue: Queue<'a>, jobId:int64) = 
         async {
+            Job<_>.logger.Info "getting job from queue %s by id %i" queue.name jobId
             let client = queue.client
             let! job = client().HashGetAllAsync (queue.toKey(jobId.ToString())) |> Async.AwaitTask
             //staan hash values altijd op dezelfde volgorde
@@ -172,6 +181,8 @@ type Job<'a> =
                 job.[3].Value |> fromValueI32) 
         }
     static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int) =
+        Job<_>.logger.Info "creating job from data \"%s\" with id %i for \
+                            queue %s with options \"%s\" and progress %i" data jobId queue.name opts progress
         let sData = JsonConvert.DeserializeObject<'a>(data)
         let sOpts = JsonConvert.DeserializeObject<Map<string, string> option>(opts)
         { queue = queue; data = sData; jobId = jobId; opts = sOpts; _progress = progress }
@@ -200,7 +211,8 @@ and Events<'a> = {
 
 and LockRenewer<'a> (job:Job<'a>, token:Guid) =
     let cts = new CancellationTokenSource ()
-    
+    static let logger = LogManager.getLogger()
+
     let rec lockRenewer (job:Job<'a>) = 
         async {
             do! job.renewLock token |> Async.Ignore
@@ -208,6 +220,7 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
             return! lockRenewer job
         }
 
+    do logger.Info "starting lock renewer for job %i with token %A" job.jobId token
     do Async.Start (lockRenewer job, cts.Token)
 
     interface IDisposable with
@@ -216,6 +229,7 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
             GC.SuppressFinalize(x);
 
     member x.Dispose(disposing) = 
+        logger.Debug "disposing lock renewer for job %i and token %A" job.jobId token
         if (disposing) then
             cts.Cancel ()
 
@@ -228,11 +242,11 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
 /// <param name="name">Name of the queue</param>
 /// <param name="connection">Redis connectionstring</param>
 and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber)) as this =
+    static let logger = LogManager.getLogger()
+
     let mutable paused = false
     let mutable processing = false
     
-    let logger = LogManager.getLogger()
-
     let channel = RedisChannel("bull:" + name + ":jobchannel", RedisChannel.PatternMode.Auto)
 
     let sub = subscriberFactory ()
@@ -274,7 +288,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 | _ as e -> 
                     logger.Error "handler failed for job %i with exn %A for queue %s" job.jobId e name
                     do! job.moveToFailed () |> Async.Ignore
-                    do! job.releaseLock () |> Async.Ignore
+                    do! job.releaseLock token |> Async.Ignore
                     do! this.emitJobEvent(Failed, job, exn = e) 
         }
 
@@ -330,6 +344,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel |> Async.Ignore
         } 
 
+    member x.name = name
     member x.``process`` (handler:Job<'a> -> Async<unit>) = 
         logger.Info "start processing queue %s" name
         this.run handler |> Async.Start
@@ -363,6 +378,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     member x.pause () = 
         async {
+            logger.Info "pausing queue %s" name
             if paused then 
                 return paused
             else 
@@ -375,14 +391,17 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         }
         
     member x.resume handler = 
+        logger.Info "resuming queue %s" name
         async { 
             if paused then
                 paused <- false
                 do! this.emitQueueEvent Resumed
-                do! this.run handler
+                this.run handler |> Async.Start
             else
                 failwith "Cannot resume running queue"
         }
+
+    member x.length = x.count 
 
     member x.count () = 
         async { 
