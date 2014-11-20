@@ -18,6 +18,7 @@ let taskIncr () = Task.Factory.StartNew(fun () -> 1L)
 let taskLPush () = Task.Factory.StartNew(fun () -> 1L)
 let taskLong () = Task.Factory.StartNew(fun () -> 1L)
 let taskTrue () = Task.Factory.StartNew(fun () -> true)
+let taskRedisResult () = Task.Factory.StartNew(fun () -> Mock<RedisResult>().Create());
 let taskJobHash () = Task.Factory.StartNew(fun () -> 
     [|
         HashEntry(toValueStr "id", toValueI64 1L)
@@ -151,7 +152,6 @@ type JobFixture () =
             verify <@ db.CreateTransaction () @> once
             ()
         } |> Async.RunSynchronously
-
 
 type QueueFixture () =
     [<Fact>]
@@ -287,19 +287,20 @@ type QueueFixture () =
 
         [<Fact>]
         let ``should call handler when a new job is added`` () = 
+            // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
-            
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
-
             let newJob = ref false
-
             do queue.``process`` (fun j -> async { newJob := true })
             
             async {
+                // When
                 let! job = queue.add({value = "test"})
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
                 let! active = queue.getActive()
                 let! completed = queue.getCompleted()
+
+                // Then
                 !newJob |> should be True
                 (active |> Array.length) |> should equal 0
                 (completed |> Array.length) |> should equal 1
@@ -307,11 +308,12 @@ type QueueFixture () =
 
         [<Fact>]
         let ``should report the correct length of the queue`` () =
+            // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
-            
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
 
             async {
+                // When
                 do! queue.add({ value = "bert1" }) |> Async.Ignore
                 do! queue.add({ value = "bert2" }) |> Async.Ignore
                 do! queue.add({ value = "bert3" }) |> Async.Ignore
@@ -320,17 +322,19 @@ type QueueFixture () =
                 do! queue.add({ value = "bert6" }) |> Async.Ignore
                 do! queue.add({ value = "bert7" }) |> Async.Ignore
 
+                // Then
                 let! count = queue.count ()
                 count |> should equal 7L
             } |> Async.RunSynchronously
 
         [<Fact>]
         let ``should be able to empty the queue`` () =
+            // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
-            
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
 
             async {
+                // When
                 do! queue.add({ value = "bert1" }) |> Async.Ignore
                 do! queue.add({ value = "bert2" }) |> Async.Ignore
                 do! queue.add({ value = "bert3" }) |> Async.Ignore
@@ -339,9 +343,46 @@ type QueueFixture () =
                 do! queue.add({ value = "bert6" }) |> Async.Ignore
                 do! queue.add({ value = "bert7" }) |> Async.Ignore
 
+                // Then
                 let! count = queue.count () 
                 count |> should equal 7L
                 do! queue.empty () |> Async.Ignore
                 let! empty = queue.count () 
                 empty |> should equal 0L
+            } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should be able to remove a job`` () =
+            async {
+                // Given
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queuename = (Guid.NewGuid ()).ToString()
+                let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                let! job1 = queue.add({ value = "test"})
+                let! job2 = queue.add({ value = "test"})
+                let! job3 = queue.add({ value = "test"})
+                let! job4 = queue.add({ value = "test"})
+                let! job5 = queue.add({ value = "test"})
+                
+                // When
+                do! job1.remove()
+                mp.GetDatabase().ListRightPopLeftPush(queue.toKey("wait"), queue.toKey("active")) |> ignore
+                do! job2.moveToCompleted() |> Async.Ignore
+                do! job2.remove()
+                mp.GetDatabase().ListRightPopLeftPush(queue.toKey("wait"), queue.toKey("active")) |> ignore
+                do! job3.moveToFailed() |> Async.Ignore
+                do! job3.remove()
+                do! queue.moveJob(queue.toKey("wait"), queue.toKey("active")) |> Async.Ignore
+                do! job4.remove()
+                do! queue.moveJob(queue.toKey("wait"), queue.toKey("paused")) |> Async.Ignore
+                do! job5.remove()
+
+                // Then
+                let! length = queue.count ()
+                length |> should equal 0L
+                mp.GetDatabase().ListLength(queue.toKey("wait")) |> should equal 0L
+                mp.GetDatabase().ListLength(queue.toKey("paused")) |> should equal 0L
+                mp.GetDatabase().ListLength(queue.toKey("active")) |> should equal 0L
+                mp.GetDatabase().SetLength(queue.toKey("completed")) |> should equal 0L
+                mp.GetDatabase().SetLength(queue.toKey("failed")) |> should equal 0L
             } |> Async.RunSynchronously

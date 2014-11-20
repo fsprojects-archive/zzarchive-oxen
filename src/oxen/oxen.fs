@@ -57,8 +57,10 @@ type Job<'a> =
         opts: Map<string,string> option
         _progress: int
     }
+    member private this.logger = LogManager.getLogger()
     member this.lockKey () = this.queue.toKey((this.jobId.ToString ()) + ":lock")
-    member this.toData () =  
+    member this.toData () =
+        this.logger.Info "creating redis hash for %i" this.jobId  
         let jsData = JsonConvert.SerializeObject (this.data)
         let jsOpts = JsonConvert.SerializeObject (this.opts)
         [|
@@ -68,6 +70,7 @@ type Job<'a> =
             HashEntry(toValueStr "progress", toValueI32 this._progress)
         |]
     member this.progress progress = 
+        this.logger.Info "reporing progress %i for job %i" progress this.jobId
         async {
             let client:IDatabase = this.queue.client()
             do! client.HashSetAsync (
@@ -76,8 +79,27 @@ type Job<'a> =
                 ) |> Async.awaitPlainTask
             do! this.queue.emitJobEvent(EventType.Progress, this, progress)
         }
-    member this.remove () = async { raise (NotImplementedException ()) }
-    member this.takeLock (token, ?renew) = async {
+    member this.remove () = 
+        async { 
+            let script = 
+                "if (redis.call(\"SISMEMBER\", KEYS[4], ARGV[1]) == 0) and (redis.call(\"SISMEMBER\", KEYS[5], ARGV[1]) == 0) then\n\
+                  redis.call(\"LREM\", KEYS[1], 0, ARGV[1])\n\
+                  redis.call(\"LREM\", KEYS[2], 0, ARGV[1])\n\
+                  redis.call(\"LREM\", KEYS[3], 0, ARGV[1])\n\
+                end\n\
+                redis.call(\"SREM\", KEYS[4], ARGV[1])\n\
+                redis.call(\"SREM\", KEYS[5], ARGV[1])\n\
+                redis.call(\"DEL\", KEYS[6])\n"
+
+            let keys = 
+                [| "active"; "wait"; "paused"; "completed"; "failed"; this.jobId.ToString() |]  
+                |> Array.map this.queue.toKey
+
+            let client = this.queue.client ()
+            return! client.ScriptEvaluateAsync (script, keys, [|this.jobId |> toValueI64|]) |> Async.AwaitTask |> Async.Ignore
+        }
+    member this.takeLock (token, ?renew) = 
+        async {
             let nx = match renew with 
                      | Some x -> When.NotExists
                      | None -> When.Always     
