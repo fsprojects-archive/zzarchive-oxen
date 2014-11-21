@@ -22,7 +22,6 @@ let taskFalse () = Task.Factory.StartNew(fun () -> false)
 let taskRedisResult () = Task.Factory.StartNew(fun () -> Mock<RedisResult>().Create());
 let taskJobHash () = Task.Factory.StartNew(fun () -> 
     [|
-        HashEntry(toValueStr "id", toValueI64 1L)
         HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "opts", toValueStr "")
         HashEntry(toValueStr "progress", toValueI32 1)
@@ -164,18 +163,21 @@ type QueueFixture () =
     let ``should be able to add a job to the queue`` () =
   
         // Given
+        let trans = Mock<ITransaction>.With(fun t ->
+            <@
+                t.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
+                t.PublishAsync (any(), any(), any()) --> taskLong ()
+                t.ExecuteAsync () --> taskTrue()
+            @>
+        )
         let db = Mock<IDatabase>.With(fun d -> 
             <@ 
                 d.HashSetAsync(any(), any()) --> taskUnit()
                 d.StringIncrementAsync(any()) --> taskIncr()
-                d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
+                d.CreateTransaction(any()) --> trans
             @>
         )
-        let sub = Mock<ISubscriber>.With(fun s ->
-            <@
-                s.PublishAsync(any(), any(), any()) --> taskLong()
-            @>
-        )
+        let sub = Mock<ISubscriber>().Create()
         let eventFired = ref false
         let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
         
@@ -187,8 +189,9 @@ type QueueFixture () =
         job.jobId |> should equal 1L
         verify <@ db.HashSetAsync(any(), any()) @> once
         verify <@ db.StringIncrementAsync(any()) @> once
-        verify <@ db.ListLeftPushAsync(any(), any(), any(), any()) @> once
-        
+        verify <@ trans.ListLeftPushAsync(any(), any(), any(), any()) @> once
+        verify <@ trans.PublishAsync(any(), any(), any()) @> once
+
     [<Fact>]
     let ``toKey should return a key that works with bull`` () = 
         // Given
@@ -206,19 +209,23 @@ type QueueFixture () =
     [<Fact>]
     let ``report progress and listen to event on queue`` () =
         async {
+            let trans = Mock<ITransaction>.With(fun t ->
+                <@
+                    t.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
+                    t.PublishAsync (any(), any(), any()) --> taskLong ()
+                    t.ExecuteAsync () --> taskTrue()
+                @>
+            )
             // Given 
             let db = Mock<IDatabase>.With(fun d -> 
                 <@ 
                     d.HashSetAsync(any(), any()) --> taskUnit()
                     d.StringIncrementAsync(any()) --> taskIncr()
-                    d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
+                    d.CreateTransaction(any()) --> trans
                 @>
             )
-            let sub = Mock<ISubscriber>.With(fun s ->
-                <@
-                    s.PublishAsync(any(), any(), any()) --> taskLong()
-                @>
-            )
+            
+            let sub = Mock<ISubscriber>().Create()
 
             let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
             
@@ -237,7 +244,8 @@ type QueueFixture () =
         
             // Then 
             !eventFired |> should be True
-            verify <@ db.ListLeftPushAsync(any(), any(), any(), any()) @> once
+            verify <@ trans.ListLeftPushAsync(any(), any(), any(), any()) @> once
+            verify <@ trans.PublishAsync(any(), any(), any()) @> once
         } |> Async.RunSynchronously    
         
     [<Fact>]
@@ -249,6 +257,8 @@ type QueueFixture () =
                     t.ListRemoveAsync (any(), any(), any(), any()) --> taskLong()
                     t.SetAddAsync (any(), (any():RedisValue), any()) --> taskTrue()
                     t.ExecuteAsync () --> taskTrue()
+                    t.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
+                    t.PublishAsync(any(), any(), any()) --> taskLong()
                 @>
             )
 
@@ -262,11 +272,7 @@ type QueueFixture () =
                     d.HashGetAllAsync(any()) --> taskJobHash()
                 @>
             )
-            let sub = Mock<ISubscriber>.With(fun s ->
-                <@
-                    s.PublishAsync(any(), any(), any()) --> taskLong()
-                @>
-            )
+            let sub = Mock<ISubscriber>().Create()
 
             let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
             let! job = queue.add({ value = "test" });
@@ -280,7 +286,8 @@ type QueueFixture () =
 
             let value = toValueI64 1L
             let key = queue.toKey("failed")
-            verify <@ db.ListLeftPushAsync(any(), value) @> once
+            verify <@ trans.ListLeftPushAsync(any(), value) @> once
+            verify <@ trans.PublishAsync(any(), any(), any()) @> once
             verify <@ trans.ListRemoveAsync(any(), any(), any(), any()) @> once
             verify <@ trans.SetAddAsync(any(), value, any()) @> once
             verify <@ db.SetMembersAsync(key) @> once
