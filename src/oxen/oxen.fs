@@ -2,6 +2,7 @@
 
 open System
 open System.IO
+open System.Collections.Generic
 open System.Threading.Tasks
 open System.Threading
 open StackExchange.Redis
@@ -65,7 +66,6 @@ type Job<'a> =
         let jsData = JsonConvert.SerializeObject (this.data)
         let jsOpts = JsonConvert.SerializeObject (this.opts)
         [|
-            HashEntry(toValueStr "id", toValueI64 this.jobId)
             HashEntry(toValueStr "data", toValueStr jsData)
             HashEntry(toValueStr "opts", toValueStr jsOpts)
             HashEntry(toValueStr "progress", toValueI32 this._progress)
@@ -175,16 +175,19 @@ type Job<'a> =
             //staan hash values altijd op dezelfde volgorde
             return Job.fromData (
                 queue, 
-                job.[0].Value |> fromValueI64, 
+                jobId,
+                job.[0].Value |> fromValueStr, 
                 job.[1].Value |> fromValueStr, 
-                job.[2].Value |> fromValueStr, 
-                job.[3].Value |> fromValueI32) 
+                job.[2].Value |> fromValueI32) 
         }
     static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int) =
         Job<_>.logger.Info "creating job from data \"%s\" with id %i for \
                             queue %s with options \"%s\" and progress %i" data jobId queue.name opts progress
         let sData = JsonConvert.DeserializeObject<'a>(data)
-        let sOpts = JsonConvert.DeserializeObject<Map<string, string> option>(opts)
+        let sOpts = 
+            match JsonConvert.DeserializeObject<Dictionary<string, string>>(opts) with 
+            | null -> None
+            | _ as x -> x |> Seq.map (fun kv -> (kv.Key, kv.Value)) |> Map.ofSeq |> Some
         { queue = queue; data = sData; jobId = jobId; opts = sOpts; _progress = progress }
 
 and OxenJobEvent<'a> =
@@ -360,18 +363,21 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             logger.Info "adding job %i to the queue %s" jobId name
             let! job = Job<'a>.create (this, jobId, data, opts) 
             let key = this.toKey "wait"
-            let! res = 
-                Async.AwaitTask <|
+            let multi = this.client().CreateTransaction();
+
+            let res = 
                 match opts with
-                | None -> this.client().ListLeftPushAsync (key, toValueI64 jobId) 
+                | None -> multi.ListLeftPushAsync (key, toValueI64 jobId) 
                 | Some opts -> 
                     if opts.ContainsKey "lifo" && bool.Parse (opts.Item "lifo") 
-                    then this.client().ListRightPushAsync (key, toValueI64 jobId) 
-                    else this.client().ListLeftPushAsync (key, toValueI64 jobId) 
-
-            let! result = this.publish job.jobId
+                    then multi.ListRightPushAsync (key, toValueI64 jobId) 
+                    else multi.ListLeftPushAsync (key, toValueI64 jobId) 
+           
+            let result =  multi.PublishAsync (channel, toValueI64 jobId)
+           
+            do! multi.ExecuteAsync() |> Async.AwaitTask |> Async.Ignore
                        
-            if result < 1L then failwith "must have atleast one subscriber, me"
+            if result.Result < 1L then failwith "must have atleast one subscriber, me"
 
             return job
         }
