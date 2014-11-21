@@ -199,13 +199,17 @@ and OxenQueueEvent<'a> =
         queue: Queue<'a>
     }
 
+and OxenNewJobEvent = 
+    {
+        jobId: int64
+    }
+
 and Events<'a> = {
     Completed: IEvent<OxenJobEvent<'a>>
     Progress: IEvent<OxenJobEvent<'a>>
     Failed: IEvent<OxenJobEvent<'a>>
     Paused: IEvent<OxenQueueEvent<'a>>
     Resumed: IEvent<OxenQueueEvent<'a>>
-    NewJob: IEvent<OxenJobEvent<'a>>
 }
 
 and LockRenewer<'a> (job:Job<'a>, token:Guid) =
@@ -240,7 +244,7 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
 /// </summary>
 /// <param name="name">Name of the queue</param>
 /// <param name="connection">Redis connectionstring</param>
-and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber)) as this =
+and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber), ?allowParallelProcessing:bool) as this =
     static let logger = LogManager.getLogger()
 
     let mutable paused = false
@@ -253,8 +257,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 channel,
                 (fun c v -> 
                     async {
-                        let! job = Job.fromId(this, fromValueI64(v))
-                        return! this.emitJobEvent(NewJob, job)
+                        let jobId = fromValueI64(v)
+                        return! this.emitNewJobEvent(jobId)
                     } |> Async.RunSynchronously))
     
     do logger.Info "subscribed to %A" channel
@@ -267,7 +271,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let failedEvent = new Event<OxenJobEvent<'a>> ()
     let pausedEvent = new Event<OxenQueueEvent<'a>> ()
     let resumedEvent = new Event<OxenQueueEvent<'a>> ()
-    let newJobEvent = new Event<OxenJobEvent<'a>> ()
+    let newJobEvent = new Event<OxenNewJobEvent> ()
+    let onNewJob = newJobEvent.Publish
 
     let once s = async { () }
 
@@ -295,16 +300,19 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             match gotIt with 
             | g when g.HasValue -> return! this.getJob (fromValueI64 g)
             | _ -> 
-                do! this.on.NewJob |> Async.AwaitEvent |> Async.Ignore
+                do! onNewJob |> Async.AwaitEvent |> Async.Ignore
                 return! getNextJob ()
         }
 
     let rec processJobs handler = 
         async {
             let! job = getNextJob ()
-            do processJob handler job |> Async.Start
+            match allowParallelProcessing |? false with
+            | true -> do processJob handler job |> Async.Start
+            | false -> do! processJob handler job
+            
             if not(paused) then 
-                do! processJobs handler
+                return! processJobs handler
         }
 
     let processStalledJob handler (job:Job<'a>) = 
@@ -459,7 +467,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         Completed = completedEvent.Publish
         Progress = progressEvent.Publish
         Failed = failedEvent.Publish
-        NewJob = newJobEvent.Publish
     }
 
     //Internals
@@ -472,6 +479,11 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             | Paused -> pausedEvent.Trigger({ queue = this });
             | Resumed -> resumedEvent.Trigger({ queue = this });
             | _ -> failwith "Not a queue event!"
+        }
+
+    member internal x.emitNewJobEvent jobId =
+        async {
+            newJobEvent.Trigger({ jobId = jobId });
         }
 
     member internal x.emitJobEvent (eventType, job:Job<'a>, ?value, ?exn, ?data) = 
@@ -488,7 +500,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             | Completed -> completedEvent.Trigger(eventData)
             | Progress -> progressEvent.Trigger(eventData)
             | Failed -> failedEvent.Trigger(eventData)
-            | NewJob -> newJobEvent.Trigger(eventData)
             | _ -> failwith "Not a job event!"
         }
 
