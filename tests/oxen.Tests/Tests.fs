@@ -409,6 +409,32 @@ type QueueFixture () =
             } |> Async.RunSynchronously
 
         [<Fact>]
+        let ``should be able to handle lifo `` () =
+            // Given
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+
+            let lifo = [("lifo", "true")] |> Map.ofList
+
+            async {
+                // When
+                do! queue.add({ value = "bert1" }, lifo) |> Async.Ignore
+                do! queue.add({ value = "bert2" }, lifo) |> Async.Ignore
+                do! queue.add({ value = "bert3" }, lifo) |> Async.Ignore
+                do! queue.add({ value = "bert4" }, lifo) |> Async.Ignore
+                do! queue.add({ value = "bert5" }, lifo) |> Async.Ignore
+                do! queue.add({ value = "bert6" }, lifo) |> Async.Ignore
+                do! queue.add({ value = "bert7" }, lifo) |> Async.Ignore
+
+                // Then
+                let! count = queue.count () 
+                count |> should equal 7L
+                let! waiting = queue.getWaiting()
+                waiting.[0].jobId |> should equal 1L
+                waiting.[6].jobId |> should equal 7L
+            } |> Async.RunSynchronously
+
+        [<Fact>]
         let ``should be able to fail processing a job`` () =
             // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")

@@ -64,7 +64,7 @@ type Job<'a> =
     member this.toData () =
         this._logger.Info "creating redis hash for job %i" this.jobId  
         let jsData = JsonConvert.SerializeObject (this.data)
-        let jsOpts = JsonConvert.SerializeObject (this.opts)
+        let jsOpts = JsonConvert.SerializeObject (this.opts |? Map.empty)
         [|
             HashEntry(toValueStr "data", toValueStr jsData)
             HashEntry(toValueStr "opts", toValueStr jsOpts)
