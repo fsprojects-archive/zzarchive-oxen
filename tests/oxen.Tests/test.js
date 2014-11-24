@@ -36,9 +36,8 @@ var promisses = [];
 for (var i = 0; i < times; i++) {
     promisses.push(q.add({ value: "test" }));
 }
-Promise.all(promisses).then(function (item) {
+Promise.all(promisses).then(function () {
 	q.count().then(function(c) {
-		console.log("done: " + item);
 		console.log("q length: " + c);
 		process.exit(0); 
 	});
