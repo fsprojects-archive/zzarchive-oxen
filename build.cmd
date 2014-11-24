@@ -1,7 +1,6 @@
 @echo off
 cls
-set PATH=c:\Program Files (x86)\nodejs\;%PATH%
-node -v
+
 IF NOT EXIST packages\FAKE\tools\FAKE.exe  (
   .nuget\nuget.exe install FAKE -OutputDirectory packages -ExcludeVersion
   .nuget\nuget.exe install SourceLink.Fake -OutputDirectory packages -ExcludeVersion

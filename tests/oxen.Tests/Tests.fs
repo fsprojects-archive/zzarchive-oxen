@@ -325,17 +325,18 @@ type QueueFixture () =
         
         paused |> should be True
 
+    type TestControlMessage = 
+        {
+            times: int
+            queueName: string    
+        }
+
     type IntegrationTests () = 
-        static let runNpmInstall () = 
-            let proc = Process.Start("npm", "install")
-            while not(proc.HasExited) do
-                Async.Sleep 100 |> Async.RunSynchronously                
-
-
-        static do runNpmInstall ()
-
+        let mp = ConnectionMultiplexer.Connect("localhost")
+        let q = Queue<TestControlMessage>("test-control-messages", mp.GetDatabase, mp.GetSubscriber)
         let sendJobWithBull queue times = 
-            Process.Start("node", "test.js " + queue + " " + times.ToString())
+            q.add({ times = times; queueName = queue }) |> Async.RunSynchronously
+            
 
         let waitForQueueToFinish (queue:Queue<_>) = 
             Async.Sleep 10 |> Async.RunSynchronously
@@ -347,7 +348,6 @@ type QueueFixture () =
                 | _ -> ()
 
             wait ()
-
 
         let waitForJobsToArrive (queue:Queue<_>) = 
             let rec wait () =
