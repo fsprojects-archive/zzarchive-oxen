@@ -328,7 +328,9 @@ type QueueFixture () =
     type IntegrationTests () = 
         static let runNpmInstall () = 
             let proc = Process.Start("npm", "install")
-            proc.Exited |> Async.AwaitEvent |> Async.RunSynchronously |> ignore
+            while not(proc.HasExited) do
+                Async.Sleep 100 |> Async.RunSynchronously                
+
 
         static do runNpmInstall ()
 
