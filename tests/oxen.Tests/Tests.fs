@@ -326,7 +326,11 @@ type QueueFixture () =
         paused |> should be True
 
     type IntegrationTests () = 
-        static do Process.Start("npm", "install") |> ignore
+        static let runNpmInstall () = 
+            let proc = Process.Start("npm", "install")
+            proc.Exited |> Async.AwaitEvent |> Async.RunSynchronously |> ignore
+
+        static do runNpmInstall ()
 
         let sendJobWithBull queue times = 
             Process.Start("node", "test.js " + queue + " " + times.ToString())
