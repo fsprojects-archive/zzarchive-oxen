@@ -339,24 +339,26 @@ type QueueFixture () =
             
 
         let waitForQueueToFinish (queue:Queue<_>) = 
-            Async.Sleep 10 |> Async.RunSynchronously
-            let rec wait () =
-                let waiting = queue.getWaiting() |> Async.RunSynchronously
-                let active = queue.getActive() |> Async.RunSynchronously
-                match waiting.Length + active.Length with
-                | x when x > 0 -> wait ()
-                | _ -> ()
-
+            let rec wait () = 
+                async {
+                    do! Async.Sleep 10
+                    let! waiting = queue.getWaiting()
+                    let! active = queue.getActive()
+                    match waiting.Length + active.Length with
+                    | x when x > 0 -> return! wait ()
+                    | _ -> ()
+                }
             wait ()
 
         let waitForJobsToArrive (queue:Queue<_>) = 
             let rec wait () =
-                Async.Sleep 10 |> Async.RunSynchronously
-                let count = queue.count() |> Async.RunSynchronously
-                match count with
-                | x when x = 0L -> wait ()
-                | _ -> ()
-
+                async {
+                    do! Async.Sleep 10
+                    let! count = queue.count()
+                    match count with
+                    | x when x = 0L -> return! wait ()
+                    | _ -> ()
+                }
             wait ()
 
         [<Fact>]
@@ -484,7 +486,7 @@ type QueueFixture () =
                 let! job1 = queue.add({ value = "bert1" }) 
                 let! job2 = queue.add({ value = "bert2" }) 
 
-                do waitForQueueToFinish queue
+                do! waitForQueueToFinish queue
 
                 // Then
                 let! j1c = job1.isCompleted 
@@ -546,8 +548,8 @@ type QueueFixture () =
                 
                 // When
                 sendJobWithBull queuename 100 |> ignore
-                do waitForJobsToArrive queue
-                do waitForQueueToFinish queue
+                do! waitForJobsToArrive queue
+                do! waitForQueueToFinish queue
 
                 //Then
                 let! length = queue.length ()
@@ -579,8 +581,8 @@ type QueueFixture () =
 
                 // When
                 sendJobWithBull queuename 100 |> ignore
-                do waitForJobsToArrive queue
-                do waitForQueueToFinish queue
+                do! waitForJobsToArrive queue
+                do! waitForQueueToFinish queue
 
                 //Then
                 let! length = queue.length ()
