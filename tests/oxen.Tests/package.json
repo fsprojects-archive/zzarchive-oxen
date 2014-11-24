@@ -4,8 +4,6 @@
   "description": "oxen bull integration tests",
   "main": "test.js",
   "dependencies": {
-    "bull": "~0.1.10",
-    "bluebird": "~2.3.11"
   },
   "devDependencies": {
     "bull": "~0.1.10",
