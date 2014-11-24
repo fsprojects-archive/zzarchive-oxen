@@ -1,5 +1,6 @@
 @echo off
 cls
+set PATH=c:\nodist\bin\;%PATH%
 
 IF NOT EXIST packages\FAKE\tools\FAKE.exe  (
   .nuget\nuget.exe install FAKE -OutputDirectory packages -ExcludeVersion
