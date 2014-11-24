@@ -1,5 +1,7 @@
 init:
   - git config --global core.autocrlf input
+install: 
+  - ps: Install-Product node 0.11
 build_script:
   - cmd: build.cmd
 test: off
