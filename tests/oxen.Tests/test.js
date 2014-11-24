@@ -1,4 +1,5 @@
 ﻿var Queue = require('bull');
+var Job = require('./node_modules/bull/lib/job');
 var Promise = require('bluebird');
 
 /**
