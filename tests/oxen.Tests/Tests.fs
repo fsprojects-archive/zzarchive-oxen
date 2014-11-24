@@ -332,7 +332,7 @@ type QueueFixture () =
         }
 
     type IntegrationTests () = 
-        let mp = ConnectionMultiplexer.Connect("localhost")
+        let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
         let q = Queue<TestControlMessage>("test-control-messages", mp.GetDatabase, mp.GetSubscriber)
         let sendJobWithBull queue times = 
             q.add({ times = times; queueName = queue }) |> Async.RunSynchronously
