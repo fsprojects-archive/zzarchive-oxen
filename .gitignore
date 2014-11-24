@@ -178,3 +178,4 @@ nuget/*.nupkg
 
 *.Tests.dll.xml
 dump.rdb
+node_modules/

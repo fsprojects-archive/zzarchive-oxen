@@ -1,0 +1,16 @@
+{
+  "name": "oxen.Tests",
+  "version": "0.0.1",
+  "description": "",
+  "main": "test.js",
+  "dependencies": {
+    "bull": "~0.1.10",
+    "bluebird": "~2.3.11"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "BSD-2-Clause"
+}

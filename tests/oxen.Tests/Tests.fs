@@ -1,13 +1,16 @@
 module oxen.Tests
 
 open System
+open System.Diagnostics
 open System.IO
-open oxen
+open System.Threading.Tasks
+
 open Foq
-open StackExchange.Redis
 open Xunit
 open FsUnit.Xunit
-open System.Threading.Tasks
+
+open oxen
+open StackExchange.Redis
 
 type Data = {
     value: string
@@ -323,7 +326,32 @@ type QueueFixture () =
         paused |> should be True
 
     type IntegrationTests () = 
-        do log4net.Config.XmlConfigurator.ConfigureAndWatch(FileInfo("log4net.config")) |> ignore
+        static do Process.Start("npm", "install") |> ignore
+
+        let sendJobWithBull queue times = 
+            Process.Start("node", "test.js " + queue + " " + times.ToString())
+
+        let waitForQueueToFinish (queue:Queue<_>) = 
+            Async.Sleep 10 |> Async.RunSynchronously
+            let rec wait () =
+                let waiting = queue.getWaiting() |> Async.RunSynchronously
+                let active = queue.getActive() |> Async.RunSynchronously
+                match waiting.Length + active.Length with
+                | x when x > 0 -> wait ()
+                | _ -> ()
+
+            wait ()
+
+
+        let waitForJobsToArrive (queue:Queue<_>) = 
+            let rec wait () =
+                Async.Sleep 10 |> Async.RunSynchronously
+                let count = queue.count() |> Async.RunSynchronously
+                match count with
+                | x when x = 0L -> wait ()
+                | _ -> ()
+
+            wait ()
 
         [<Fact>]
         let ``should call handler when a new job is added`` () = 
@@ -450,16 +478,7 @@ type QueueFixture () =
                 let! job1 = queue.add({ value = "bert1" }) 
                 let! job2 = queue.add({ value = "bert2" }) 
 
-                do! async {
-                        let rec wait () =
-                            let waiting = queue.getWaiting() |> Async.RunSynchronously
-                            let active = queue.getActive() |> Async.RunSynchronously
-                            match waiting.Length + active.Length with
-                            | x when x > 0 -> wait ()
-                            | _ -> ()
-
-                        wait ()
-                    } 
+                do waitForQueueToFinish queue
 
                 // Then
                 let! j1c = job1.isCompleted 
@@ -504,4 +523,63 @@ type QueueFixture () =
                 mp.GetDatabase().ListLength(queue.toKey("active")) |> should equal 0L
                 mp.GetDatabase().SetLength(queue.toKey("completed")) |> should equal 0L
                 mp.GetDatabase().SetLength(queue.toKey("failed")) |> should equal 0L
+            } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should be able to send a job from bull to oxen`` () = 
+            async {
+                // Given
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queuename = (Guid.NewGuid ()).ToString()
+                let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                queue.``process`` (fun j -> 
+                    async {
+                        Debug.Print (j.jobId.ToString ())
+                        Debug.Print "huuu"
+                    })
+                
+                // When
+                sendJobWithBull queuename 100 |> ignore
+                do waitForJobsToArrive queue
+                do waitForQueueToFinish queue
+
+                //Then
+                let! length = queue.length ()
+                length |> should equal 0L
+                let! completed = queue.getCompleted ()
+                completed.Length |> should equal 100
+
+            } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should be able to send a job from bull to oxen with two listening queue's`` () = 
+            async {
+                // Given
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queuename = (Guid.NewGuid ()).ToString()
+                let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                queue.``process`` (fun j -> 
+                    async {
+                        Debug.Print (j.jobId.ToString ())
+                        Debug.Print "huuu"
+                    })
+                
+                let queue2 = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                queue2.``process`` (fun j -> 
+                    async {
+                        Debug.Print (j.jobId.ToString ())
+                        Debug.Print "huuu2"
+                    })
+
+                // When
+                sendJobWithBull queuename 100 |> ignore
+                do waitForJobsToArrive queue
+                do waitForQueueToFinish queue
+
+                //Then
+                let! length = queue.length ()
+                length |> should equal 0L
+                let! completed = queue.getCompleted ()
+                completed.Length |> should equal 100
+
             } |> Async.RunSynchronously

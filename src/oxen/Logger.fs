@@ -1,13 +1,13 @@
 ﻿namespace oxen
     open System
+    open System.IO
     open System.Diagnostics
     open log4net
    
     // log4f
     type Logger(logger: ILog) =
 
-        do log4net.Config.XmlConfigurator.ConfigureAndWatch 
-            (System.IO.FileInfo (AppDomain.CurrentDomain.BaseDirectory + "log4net.config")) |> ignore
+        do log4net.Config.XmlConfigurator.ConfigureAndWatch (FileInfo "log4net.config") |> ignore
 
         member __.RawILog = logger
         member __.IsDebugEnabled = logger.IsDebugEnabled

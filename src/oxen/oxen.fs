@@ -5,7 +5,9 @@ open System.IO
 open System.Collections.Generic
 open System.Threading.Tasks
 open System.Threading
+
 open StackExchange.Redis
+
 open Newtonsoft.Json
 
 
@@ -244,7 +246,7 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
 /// </summary>
 /// <param name="name">Name of the queue</param>
 /// <param name="connection">Redis connectionstring</param>
-and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber), ?allowParallelProcessing:bool) as this =
+and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber), ?forceSequentialProcessing:bool) as this =
     static let logger = LogManager.getLogger()
 
     let mutable paused = false
@@ -307,9 +309,9 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let rec processJobs handler = 
         async {
             let! job = getNextJob ()
-            match allowParallelProcessing |? false with
-            | true -> do processJob handler job |> Async.Start
-            | false -> do! processJob handler job
+            match forceSequentialProcessing |? false with
+            | true -> do! processJob handler job
+            | false -> do processJob handler job |> Async.Start
             
             if not(paused) then 
                 return! processJobs handler
