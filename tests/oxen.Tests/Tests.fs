@@ -550,7 +550,7 @@ type QueueFixture () =
                 // When
                 sendJobWithBull queuename 100 |> ignore
                 do! waitForJobsToArrive queue
-                //do! waitForQueueToFinish queue
+                do! waitForQueueToFinish queue
 
                 //Then
                 let! length = queue.length ()
@@ -583,7 +583,7 @@ type QueueFixture () =
                 // When
                 sendJobWithBull queuename 100 |> ignore
                 do! waitForJobsToArrive queue
-                //do! waitForQueueToFinish queue
+                do! waitForQueueToFinish queue
 
                 //Then
                 let! length = queue.length ()

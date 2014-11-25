@@ -136,38 +136,33 @@ Target "StartRedis" (fun _ ->
     } |> Async.Start
 )
 
-Target "StartTestControlQueue" (fun _ -> 
-    async {
-        let npm = 
-            match tryFindFileOnPath ("npm") with 
-            | Some x ->  
-                #if MONO
-                let y = x
-                #else
-                let y = x + ".cmd"
-                #endif
-                trace ("npm found here: " + x)
-                Shell.Exec(y, "install",  "tests/oxen.Tests/")
-            | None -> 42
+Target "RunNpmInstall" (fun _ -> 
+    match tryFindFileOnPath ("npm") with 
+    | Some x ->  
+        #if MONO
+        let y = x
+        #else
+        let y = x + ".cmd"
+        #endif
+        trace ("npm found here: " + x)
+        Shell.Exec(y, "install",  "tests/oxen.Tests/") |> ignore
+    | None -> ()
+)
 
-        let node = 
-            #if MONO 
-            "node"
-            #else
-            "node.exe"
-            #endif
-
-        let node =
-            match tryFindFileOnPath (node) with
-            | Some x -> 
-                trace ("node found here: " + x)
-                Shell.Exec(x, "test.js", "tests/oxen.Tests/")
-            | None -> 
-                trace ("node not-found")
-                42
-
-        ()
-    } |> Async.Start
+Target "StartTestControlQueue" (fun _ ->
+    let node = 
+        #if MONO 
+        "node"
+        #else
+        "node.exe"
+        #endif
+    do match tryFindFileOnPath (node) with
+        | Some x -> 
+            trace ("node found here: " + x)
+            Shell.AsyncExec(x, "test.js", "tests/oxen.Tests/") |> Async.Ignore |> Async.Start 
+        | None -> 
+            trace ("node not-found")
+            ()
 )
 
 Target "RunTests" (fun _ ->
@@ -273,6 +268,7 @@ Target "All" DoNothing
   ==> "BuildStackExchangeRedis"
   #endif
   ==> "Build"
+  ==> "RunNpmInstall"
   ==> "StartTestControlQueue"
   #if MONO 
   #else
