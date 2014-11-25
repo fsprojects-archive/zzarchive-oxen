@@ -560,35 +560,35 @@ type QueueFixture () =
 
             } |> Async.RunSynchronously
 
-//        [<Fact>]
-//        let ``should be able to send a job from bull to oxen with two listening queue's`` () = 
-//            async {
-//                // Given
-//                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
-//                let queuename = (Guid.NewGuid ()).ToString()
-//                let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
-//                queue.``process`` (fun j -> 
-//                    async {
-//                        Debug.Print (j.jobId.ToString ())
-//                        Debug.Print "huuu"
-//                    })
-//                
-//                let queue2 = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
-//                queue2.``process`` (fun j -> 
-//                    async {
-//                        Debug.Print (j.jobId.ToString ())
-//                        Debug.Print "huuu2"
-//                    })
-//
-//                // When
-//                sendJobWithBull queuename 100 |> ignore
-//                do! waitForJobsToArrive queue
-//                do! waitForQueueToFinish queue
-//
-//                //Then
-//                let! length = queue.length ()
-//                length |> should equal 0L
-//                let! completed = queue.getCompleted ()
-//                completed.Length |> should equal 100
-//
-//            } |> Async.RunSynchronously
+        [<Fact>]
+        let ``should be able to send a job from bull to oxen with two listening queue's`` () = 
+            async {
+                // Given
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queuename = (Guid.NewGuid ()).ToString()
+                let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                queue.``process`` (fun j -> 
+                    async {
+                        Debug.Print (j.jobId.ToString ())
+                        Debug.Print "huuu"
+                    })
+                
+                let queue2 = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                queue2.``process`` (fun j -> 
+                    async {
+                        Debug.Print (j.jobId.ToString ())
+                        Debug.Print "huuu2"
+                    })
+
+                // When
+                sendJobWithBull queuename 100 |> ignore
+                do! waitForJobsToArrive queue
+                do! waitForQueueToFinish queue
+
+                //Then
+                let! length = queue.length ()
+                length |> should equal 0L
+                let! completed = queue.getCompleted ()
+                completed.Length |> should equal 100
+
+            } |> Async.RunSynchronously
