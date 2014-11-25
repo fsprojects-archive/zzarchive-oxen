@@ -342,7 +342,7 @@ type QueueFixture () =
         let waitForQueueToFinish (queue:Queue<_>) = 
             let rec wait () = 
                 async {
-                    do! Async.Sleep 100
+                    //do! Async. 100
                     let! waiting = queue.getWaiting()
                     let! active = queue.getActive()
                     match waiting.Length + active.Length with
@@ -354,7 +354,7 @@ type QueueFixture () =
         let waitForJobsToArrive (queue:Queue<_>) = 
             let rec wait () =
                 async {
-                    do! Async.Sleep 100
+                    ///do! Async.Sleep 100
                     let! count = queue.count()
                     match count with
                     | x when x = 0L -> return! wait ()
@@ -533,33 +533,33 @@ type QueueFixture () =
                 mp.GetDatabase().SetLength(queue.toKey("completed")) |> should equal 0L
                 mp.GetDatabase().SetLength(queue.toKey("failed")) |> should equal 0L
             } |> Async.RunSynchronously
-//
-//        [<Fact>]
-//        let ``should be able to send a job from bull to oxen`` () = 
-//            async {
-//                // Given
-//                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
-//                let queuename = (Guid.NewGuid ()).ToString()
-//                let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
-//                queue.``process`` (fun j -> 
-//                    async {
-//                        Debug.Print (j.jobId.ToString ())
-//                        Debug.Print "huuu"
-//                    })
-//                
-//                // When
-//                sendJobWithBull queuename 100 |> ignore
-//                do! waitForJobsToArrive queue
-//                do! waitForQueueToFinish queue
-//
-//                //Then
-//                let! length = queue.length ()
-//                length |> should equal 0L
-//                let! completed = queue.getCompleted ()
-//                completed.Length |> should equal 100
-//
-//            } |> Async.RunSynchronously
-//
+
+        [<Fact>]
+        let ``should be able to send a job from bull to oxen`` () = 
+            async {
+                // Given
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queuename = (Guid.NewGuid ()).ToString()
+                let queue = new Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                queue.``process`` (fun j -> 
+                    async {
+                        Debug.Print (j.jobId.ToString ())
+                        Debug.Print "huuu"
+                    })
+                
+                // When
+                sendJobWithBull queuename 100 |> ignore
+                do! waitForJobsToArrive queue
+                do! waitForQueueToFinish queue
+
+                //Then
+                let! length = queue.length ()
+                length |> should equal 0L
+                let! completed = queue.getCompleted ()
+                completed.Length |> should equal 100
+
+            } |> Async.RunSynchronously
+
 //        [<Fact>]
 //        let ``should be able to send a job from bull to oxen with two listening queue's`` () = 
 //            async {
