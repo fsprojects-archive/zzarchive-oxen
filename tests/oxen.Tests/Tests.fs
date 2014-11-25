@@ -345,7 +345,6 @@ type QueueFixture () =
                     do! Async.Sleep 100
                     let! waiting = queue.getWaiting()
                     let! active = queue.getActive()
-                    logger.Debug "active and waiting %i" (waiting.Length + active.Length)
                     match waiting.Length + active.Length with
                     | x when x > 0 -> return! wait ()
                     | _ -> ()
@@ -357,7 +356,6 @@ type QueueFixture () =
                 async {
                     do! Async.Sleep 100
                     let! count = queue.count()
-                    logger.Debug "queue length %i" count
                     match count with
                     | x when x = 0L -> return! wait ()
                     | _ -> ()
@@ -552,7 +550,7 @@ type QueueFixture () =
                 // When
                 sendJobWithBull queuename 100 |> ignore
                 do! waitForJobsToArrive queue
-                do! waitForQueueToFinish queue
+                //do! waitForQueueToFinish queue
 
                 //Then
                 let! length = queue.length ()
@@ -585,7 +583,7 @@ type QueueFixture () =
                 // When
                 sendJobWithBull queuename 100 |> ignore
                 do! waitForJobsToArrive queue
-                do! waitForQueueToFinish queue
+                //do! waitForQueueToFinish queue
 
                 //Then
                 let! length = queue.length ()
