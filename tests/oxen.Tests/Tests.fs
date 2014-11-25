@@ -332,6 +332,7 @@ type QueueFixture () =
         }
 
     type IntegrationTests () = 
+        let logger = LogManager.getNamedLogger "IntegrationTests"
         let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
         let q = Queue<TestControlMessage>("test-control-messages", mp.GetDatabase, mp.GetSubscriber)
         let sendJobWithBull queue times = 
@@ -341,9 +342,10 @@ type QueueFixture () =
         let waitForQueueToFinish (queue:Queue<_>) = 
             let rec wait () = 
                 async {
-                    do! Async.Sleep 10
+                    do! Async.Sleep 100
                     let! waiting = queue.getWaiting()
                     let! active = queue.getActive()
+                    logger.Debug "active and waiting %i" (waiting.Length + active.Length)
                     match waiting.Length + active.Length with
                     | x when x > 0 -> return! wait ()
                     | _ -> ()
@@ -353,8 +355,9 @@ type QueueFixture () =
         let waitForJobsToArrive (queue:Queue<_>) = 
             let rec wait () =
                 async {
-                    do! Async.Sleep 10
+                    do! Async.Sleep 100
                     let! count = queue.count()
+                    logger.Debug "queue length %i" count
                     match count with
                     | x when x = 0L -> return! wait ()
                     | _ -> ()
