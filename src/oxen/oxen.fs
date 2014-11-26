@@ -245,7 +245,9 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
 /// The queue
 /// </summary>
 /// <param name="name">Name of the queue</param>
-/// <param name="connection">Redis connectionstring</param>
+/// <param name="dbFactory">a function returning a new instance of IDatabase</param>
+/// <param name="subscriberFactory">a function returning a new instance of ISubscriber</param>
+/// <param name="forceSequentialProcessing">a boolean specifying whether or not this queue will handle jobs sequentially, not in parallel</param>
 and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber), ?forceSequentialProcessing:bool) as this =
     static let logger = LogManager.getLogger()
 
@@ -409,8 +411,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             else
                 failwith "Cannot resume running queue"
         }
-
-    member x.length = x.count 
 
     member x.count () = 
         async { 

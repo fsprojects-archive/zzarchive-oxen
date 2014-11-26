@@ -384,6 +384,29 @@ type QueueFixture () =
             } |> Async.RunSynchronously
 
         [<Fact>]
+        let ``should process stalled jobs when queue starts`` () = 
+            // Given
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+            
+            async {
+                // When
+                let! job = queue.add({value = "test"});
+                do! queue.moveJob(queue.toKey("wait"), queue.toKey("active")) |> Async.Ignore
+                let stalledJob = ref false
+                queue.``process``(fun j -> async {
+                    stalledJob := true    
+                })
+                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
+
+                // Then
+                !stalledJob |> should be True
+                let! active = queue.getActive()
+                active.Length |> should equal 0
+            } |> Async.RunSynchronously
+
+
+        [<Fact>]
         let ``should report the correct length of the queue`` () =
             // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
@@ -416,6 +439,8 @@ type QueueFixture () =
                 let token = Guid.NewGuid ()
                 let! lockTaken = job.takeLock (token)
                 let! lockReleased = job.releaseLock (token)
+                
+                // Then
                 lockTaken |> should be True
                 lockReleased |> should equal 1L
                 mp.GetDatabase().StringLength (job.lockKey()) |> should equal 0L
@@ -553,11 +578,10 @@ type QueueFixture () =
                 do! waitForQueueToFinish queue
 
                 //Then
-                let! length = queue.length ()
+                let! length = queue.count ()
                 length |> should equal 0L
                 let! completed = queue.getCompleted ()
                 completed.Length |> should equal 100
-
             } |> Async.RunSynchronously
 
         [<Fact>]
@@ -586,7 +610,7 @@ type QueueFixture () =
                 do! waitForQueueToFinish queue
 
                 //Then
-                let! length = queue.length ()
+                let! length = queue.count ()
                 length |> should equal 0L
                 let! completed = queue.getCompleted ()
                 completed.Length |> should equal 100
