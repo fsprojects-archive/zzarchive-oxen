@@ -358,6 +358,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     
     member x.run handler = 
         async {
+            do! Async.SwitchToNewThread ()
             do! [| (processStalledJobs handler); (processJobs handler) |] |> Async.Parallel |> Async.Ignore
         }
     
