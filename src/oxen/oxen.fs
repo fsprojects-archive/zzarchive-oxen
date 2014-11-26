@@ -276,8 +276,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let newJobEvent = new Event<OxenNewJobEvent> ()
     let onNewJob = newJobEvent.Publish
 
-    let once s = async { () }
-
     let processJob handler job = 
         async { 
             if paused then ()
