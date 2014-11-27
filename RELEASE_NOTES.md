@@ -1,2 +1,3 @@
-#### 0.0.0-beta - not released
+#### 0.0.1 - released
 * Initial release
+
