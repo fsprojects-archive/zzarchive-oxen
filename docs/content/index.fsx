@@ -2,9 +2,9 @@
 // This block of code is omitted in the generated HTML documentation. Use 
 // it to define helpers that you do not want to show in the documentation.
 #I "../../bin"
-
+#r "log4net.dll"
 (**
-F# Project Scaffold
+oxen
 ===================
 
 Documentation
@@ -13,8 +13,8 @@ Documentation
   <div class="span1"></div>
   <div class="span6">
     <div class="well well-small" id="nuget">
-      The F# ProjectTemplate library can be <a href="https://nuget.org/packages/FSharp.ProjectTemplate">installed from NuGet</a>:
-      <pre>PM> Install-Package FSharp.ProjectTemplate</pre>
+      oxen can be <a href="https://nuget.org/packages/oxen">installed from NuGet</a>:
+      <pre>PM> Install-Package oxen</pre>
     </div>
   </div>
   <div class="span1"></div>
@@ -26,10 +26,28 @@ Example
 This example demonstrates using a function defined in this sample library.
 
 *)
-#r "FSharp.ProjectTemplate.dll"
-open FSharp.ProjectTemplate
+#r "oxen.dll"
+#r "StackExchange.Redis"
 
-printfn "hello = %i" <| Library.hello 0
+open oxen
+open StackExchange.Redis
+
+module example =
+    type QueueData = {
+        value: string
+    }
+
+
+    let multiplexer = ConnectionMultiplexer.Connect("localhost")
+    let queue = Queue<QueueData>("examplequeue", multiplexer.GetDatabase, multiplexer.GetSubscriber)
+
+    queue.``process`` (fun job -> 
+        async {
+            printfn "handling job with id %i and value %s" job.jobId job.data.value
+        }
+    )
+
+    queue.add({ value = "testing 123"})
 
 (**
 Some more info

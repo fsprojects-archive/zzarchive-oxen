@@ -1,0 +1,18 @@
+{
+  "name": "oxen.Tests",
+  "version": "0.0.1",
+  "description": "oxen bull integration tests",
+  "main": "test.js",
+  "dependencies": {},
+  "devDependencies": {
+    "bull": "~0.1.10",
+    "bluebird": "~2.3.11",
+    "lodash": "~2.4.1",
+    "redis": "~0.12.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "CURIT",
+  "license": "BSD-2-Clause"
+}
