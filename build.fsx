@@ -77,7 +77,8 @@ let genFSAssemblyInfo (projectPath) =
         Attribute.Product project
         Attribute.Description summary
         Attribute.Version release.AssemblyVersion
-        Attribute.FileVersion release.AssemblyVersion ]
+        Attribute.FileVersion release.AssemblyVersion
+        Attribute.InternalsVisibleTo "oxen.Tests" ]
 
 let genCSAssemblyInfo (projectPath) =
     let projectName = System.IO.Path.GetFileNameWithoutExtension(projectPath)
@@ -111,10 +112,16 @@ Target "CleanDocs" (fun _ ->
     CleanDirs ["docs/output"]
 )
 
+Target "BuildStackExchangeRedis" (fun _ ->
+    "StackExchange.Redis/StackExchange.Redis/bin/mono/StackExchange.Redis.dll" 
+        |> CopyFile ("packages/StackExchange.Redis.1.0.371/lib/net45/") 
+)
+
 // --------------------------------------------------------------------------------------
 // Build library & test project
 
 Target "Build" (fun _ ->
+    
     !! solutionFile
     |> MSBuildRelease "" "Rebuild"
     |> ignore
@@ -122,6 +129,41 @@ Target "Build" (fun _ ->
 
 // --------------------------------------------------------------------------------------
 // Run the unit tests using test runner
+
+Target "StartRedis" (fun _ ->
+    async {
+        Shell.Exec("./packages/Redis-64.2.8.17/redis-server.exe") |> ignore
+    } |> Async.Start
+)
+
+Target "RunNpmInstall" (fun _ -> 
+    match tryFindFileOnPath ("npm") with 
+    | Some x ->  
+        #if MONO
+        let y = x
+        #else
+        let y = x + ".cmd"
+        #endif
+        trace ("npm found here: " + x)
+        Shell.Exec(y, "install",  "tests/oxen.Tests/") |> ignore
+    | None -> ()
+)
+
+Target "StartTestControlQueue" (fun _ ->
+    let node = 
+        #if MONO 
+        "node"
+        #else
+        "node.exe"
+        #endif
+    do match tryFindFileOnPath (node) with
+        | Some x -> 
+            trace ("node found here: " + x)
+            Shell.AsyncExec(x, "test.js", "tests/oxen.Tests/") |> Async.Ignore |> Async.Start 
+        | None -> 
+            trace ("node not-found")
+            ()
+)
 
 Target "RunTests" (fun _ ->
     !! testAssemblies
@@ -222,9 +264,18 @@ Target "All" DoNothing
 "Clean"
   ==> "RestorePackages"
   ==> "AssemblyInfo"
+  #if MONO
+  ==> "BuildStackExchangeRedis"
+  #endif
   ==> "Build"
+  ==> "RunNpmInstall"
+  ==> "StartTestControlQueue"
+  #if MONO 
+  #else
+  ==> "StartRedis"
+  #endif
   ==> "RunTests"
-  //=?> ("GenerateReferenceDocs",isLocalBuild && not isMono)
+  =?> ("GenerateReferenceDocs",isLocalBuild && not isMono)
   =?> ("GenerateDocs",isLocalBuild && not isMono)
   ==> "All"
   =?> ("ReleaseDocs",isLocalBuild && not isMono)
@@ -240,7 +291,7 @@ Target "All" DoNothing
 
 "CleanDocs"
   ==> "GenerateHelp"
-  //==> "GenerateReferenceDocs"
+  ==> "GenerateReferenceDocs"
   ==> "GenerateDocs"
     
 "ReleaseDocs"
