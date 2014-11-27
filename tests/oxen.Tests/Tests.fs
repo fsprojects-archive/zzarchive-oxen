@@ -181,7 +181,6 @@ type QueueFixture () =
             @>
         )
         let sub = Mock<ISubscriber>().Create()
-        let eventFired = ref false
         let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
         
         // When

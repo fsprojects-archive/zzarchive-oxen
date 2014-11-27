@@ -74,7 +74,7 @@ type Job<'a> =
         |]
     member this.progress progress = 
         async {
-            this._logger.Info "reporing progress %i for job %i" progress this.jobId
+            this._logger.Info "reporting progress %i for job %i" progress this.jobId
             let client:IDatabase = this.queue.client()
             do! client.HashSetAsync (
                     this.queue.toKey(this.jobId.ToString ()), 
@@ -172,7 +172,6 @@ type Job<'a> =
         async {
             let client = queue.client
             let! job = client().HashGetAllAsync (queue.toKey(jobId.ToString())) |> Async.AwaitTask
-            //staan hash values altijd op dezelfde volgorde
             return Job.fromData (
                 queue, 
                 jobId,
