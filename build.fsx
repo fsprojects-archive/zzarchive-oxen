@@ -32,14 +32,14 @@ let project = "oxen"
 
 // Short summary of the project
 // (used as description in AssemblyInfo and as a short summary for NuGet package)
-let summary = "fsharp client for bull.js"
+let summary = "fsharp implementation of Optimalbits/bull"
 
 // Longer description of the project
 // (used as a description for NuGet package; line breaks are automatically cleaned up)
-let description = "fsharp client for bull.js"
+let description = "fsharp implementation of Optimalbits/bull"
 
 // List of author names (for NuGet package)
-let authors = [ "Curit" ]
+let authors = [ "Curit"; "albertjan"; "remkoboschker" ]
 
 // Tags for your project (for NuGet package)
 let tags = "redis queue fsharp oxen"
@@ -212,7 +212,12 @@ Target "NuGet" (fun _ ->
             OutputPath = "bin"
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey"
-            Dependencies = [] })
+            Dependencies = 
+                [
+                    "StackExchange.Redis", GetPackageVersion "./packages/" "StackExchange.Redis"
+                    "log4net",  GetPackageVersion "./packages/" "log4net"
+                ]
+        })
         ("nuget/" + project + ".nuspec")
 )
 
