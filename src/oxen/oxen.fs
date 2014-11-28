@@ -9,16 +9,24 @@ open System.Threading
 open StackExchange.Redis
 
 open Newtonsoft.Json
+open Newtonsoft.Json.Serialization
 
-
+/// Convenience methods to interop with StackExchange.Redis
 [<AutoOpen>]
 module OxenConvenience = 
+    /// make RedisValue from string
     let toValueStr (x:string) = RedisValue.op_Implicit(x:string)
+    /// make RedisValue from long
     let toValueI64 (x:int64) = RedisValue.op_Implicit(x:int64)
+    /// make RedisValue from int
     let toValueI32 (x:int32) = RedisValue.op_Implicit(x:int32)
+    /// get string from RedisValue
     let fromValueStr (x:RedisValue):string = string(x)
+    /// get long from RedisValue
     let fromValueI64 (x:RedisValue):int64 = int64(x)
+    /// get int from RedisValue
     let fromValueI32 (x:RedisValue):int = int(x)
+    /// get RedisValue from RedisKey with a long in the middle
     let valueToKeyLong (x:RedisValue):RedisKey = RedisKey.op_Implicit(int64(x).ToString ())
 
     /// <summary>
@@ -30,8 +38,10 @@ module OxenConvenience =
     /// </summary>
     let (|?) (x: 'a option) (y: 'a) =  match x with | None -> y | Some z -> z
 
-    let LOCK_RENEW_TIME = 5000.0
+    /// lock renew time = 5000 milliseconds
+    let LOCK_RENEW_TIME = 5000.0   
 
+/// [omit]
 module Async =
     let inline awaitPlainTask (task: Task) = 
         // rethrow exception from preceding task if it fauled
@@ -44,6 +54,7 @@ module Async =
     let inline startAsPlainTask (work : Async<unit>) = 
         Task.Factory.StartNew(fun () -> work |> Async.RunSynchronously)
 
+/// [omit]
 type EventType = 
     | Completed
     | Progress
@@ -52,6 +63,7 @@ type EventType =
     | Resumed
     | NewJob
 
+/// A job that can be added to the queue. Where the generic type specifies the type of the data property
 type Job<'a> = 
     {
         queue: Queue<'a>
@@ -62,7 +74,9 @@ type Job<'a> =
     }
     static member private logger = LogManager.getLogger()
     member private this._logger = Job<'a>.logger
+    /// returns the redis key for the lock for this job
     member this.lockKey () = this.queue.toKey((this.jobId.ToString ()) + ":lock")
+    /// retuns a HashEntry [] containing the data as it's stored in redis
     member this.toData () =
         this._logger.Info "creating redis hash for job %i" this.jobId  
         let jsData = JsonConvert.SerializeObject (this.data)
@@ -72,6 +86,7 @@ type Job<'a> =
             HashEntry(toValueStr "opts", toValueStr jsOpts)
             HashEntry(toValueStr "progress", toValueI32 this._progress)
         |]
+    /// report the progres of this job
     member this.progress progress = 
         async {
             this._logger.Info "reporting progress %i for job %i" progress this.jobId
@@ -82,6 +97,7 @@ type Job<'a> =
                 ) |> Async.awaitPlainTask
             do! this.queue.emitJobEvent(EventType.Progress, this, progress)
         }
+    /// remove all traces of this job atomically
     member this.remove () = 
         async { 
             this._logger.Info "removeing job %i" this.jobId
@@ -102,11 +118,13 @@ type Job<'a> =
             let client = this.queue.client ()
             return! client.ScriptEvaluateAsync (script, keys, [|this.jobId |> toValueI64|]) |> Async.AwaitTask |> Async.Ignore
         }
+    /// take a lock on this job, tell other queue's you're working on it.
     member this.takeLock (token, ?renew) = 
         async {
             this._logger.Info "taking lock with token %A for job %i renewed %b" token this.jobId (renew |? false)
             let nx = match renew with 
-                     | Some x -> When.NotExists
+                     | Some x when x -> When.NotExists
+                     | Some x when not(x) -> When.Always 
                      | None -> When.Always     
             let value = (token.ToString ()) |> toValueStr
             let client:IDatabase = this.queue.client()
@@ -118,7 +136,10 @@ type Job<'a> =
                     nx 
                 ) |> Async.AwaitTask
         }
+    /// renew the lock on this job.
     member this.renewLock token = this.takeLock (token, true)
+    
+    /// release lock on this job
     member this.releaseLock (token) = 
         async {
             this._logger.Info "releasing lock with token %A for job %i" token this.jobId
@@ -155,11 +176,20 @@ type Job<'a> =
             let client:IDatabase = this.queue.client()
             return! client.SetContainsAsync(this.queue.toKey(list), toValueI64 this.jobId) |> Async.AwaitTask
         }
+
+    /// move this job to the completed list.
     member this.moveToCompleted () = this.moveToSet("completed")
+
+    /// move this job to the failed list.
     member this.moveToFailed () = this.moveToSet("failed")
+    
+    /// see if the job is completed.
     member this.isCompleted = this.isDone("completed");
+    
+    /// see if job failed.
     member this.isFailed = this.isDone("failed");
     
+    /// create a new job (note: The job will be stored in redis but it won't be added to the waiting list. You should probably use `Queue.add`)
     static member create (queue, jobId, data:'a, opts) = 
         async { 
             Job<_>.logger.Info "creating job for queue %s with id %i and data %A and options %A" (queue:Queue<'a>).name jobId data opts
@@ -168,6 +198,7 @@ type Job<'a> =
             do! client.HashSetAsync (queue.toKey (jobId.ToString ()), job.toData ()) |> Async.awaitPlainTask
             return job 
         }
+    /// get job from redis by job id and queue
     static member fromId<'a> (queue: Queue<'a>, jobId:int64) = 
         async {
             let client = queue.client
@@ -179,6 +210,7 @@ type Job<'a> =
                 job.[1].Value |> fromValueStr, 
                 job.[2].Value |> fromValueI32) 
         }
+    /// create a job from a redis hash
     static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int) =
         let sData = JsonConvert.DeserializeObject<'a>(data)
         let sOpts = 
@@ -186,7 +218,8 @@ type Job<'a> =
             | null -> None
             | _ as x -> x |> Seq.map (fun kv -> (kv.Key, kv.Value)) |> Map.ofSeq |> Some
         { queue = queue; data = sData; jobId = jobId; opts = sOpts; _progress = progress }
-
+/// a job event 
+/// i.e.: Completed, Progress, Failed
 and OxenJobEvent<'a> =
     {
         job: Job<'a>
@@ -194,17 +227,18 @@ and OxenJobEvent<'a> =
         progress: int option
         err: exn option
     }
-
+/// a queue event 
+/// i.e.: Paused, Resumed
 and OxenQueueEvent<'a> =
     {
         queue: Queue<'a>
     }
-
+/// [omit]
 and OxenNewJobEvent = 
     {
         jobId: int64
     }
-
+/// [omit]
 and Events<'a> = {
     Completed: IEvent<OxenJobEvent<'a>>
     Progress: IEvent<OxenJobEvent<'a>>
@@ -212,11 +246,11 @@ and Events<'a> = {
     Paused: IEvent<OxenQueueEvent<'a>>
     Resumed: IEvent<OxenQueueEvent<'a>>
 }
-
+/// [omit]
 and LockRenewer<'a> (job:Job<'a>, token:Guid) =
-    let cts = new CancellationTokenSource ()
     static let logger = LogManager.getLogger()
-
+    
+    let cts = new CancellationTokenSource ()
     let rec lockRenewer (job:Job<'a>) = 
         async {
             do! job.renewLock token |> Async.Ignore
@@ -249,6 +283,11 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
 /// <param name="forceSequentialProcessing">a boolean specifying whether or not this queue will handle jobs sequentially, not in parallel</param>
 and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber), ?forceSequentialProcessing:bool) as this =
     static let logger = LogManager.getLogger()
+    static do JsonConvert.DefaultSettings <- Func<JsonSerializerSettings>(fun () -> 
+        let settings = JsonSerializerSettings()
+        settings.ContractResolver <- CamelCasePropertyNamesContractResolver()
+        settings
+    )
 
     let mutable paused = false
     let mutable processing = false
@@ -350,17 +389,24 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel |> Async.Ignore
         } 
 
+    /// the name of the queue use this to uniquely identify the queue. (note: will be used in the redis keys like "bull:<queuename>:wait"
     member x.name = name
+    /// start the queue. 
+    /// Takes handler: `Job<'a> -> Async<unit>` that will be called for every job this queue handles.
     member x.``process`` (handler:Job<'a> -> Async<unit>) = 
         logger.Info "start processing queue %s" name
         this.run handler |> Async.Start
-    
+   
+    /// run the handler. 
+    /// note: (you should probably use: ``process`` but if you want to keep the returned async to control it cancel it for example, use this.)
+    /// note 2: (async switches to a different thread) 
     member x.run handler = 
         async {
             do! Async.SwitchToNewThread ()
             do! [| (processStalledJobs handler); (processJobs handler) |] |> Async.Parallel |> Async.Ignore
         }
     
+    /// add a job to the queue.
     member x.add (data, ?opts:Map<string,string>) = 
         async {
             let! jobId = this.client().StringIncrementAsync (this.toKey "id") |> Async.AwaitTask
@@ -386,6 +432,9 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             return job
         }
 
+    /// pause the queue
+    /// note: (waits for the last job to finish before pausing the queue.)
+    /// note 2: (this turns a bit akward when the jobs run in parallel so it might just do two more jobs before it pauses, but it will pause I promise)
     member x.pause () = 
         async {
             logger.Info "pausing queue %s" name
@@ -399,7 +448,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 do! this.emitQueueEvent Paused 
                 return paused
         }
-        
+      
+    /// resume a paused queue  
     member x.resume handler = 
         async { 
             logger.Info "resuming queue %s" name
@@ -411,6 +461,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 failwith "Cannot resume running queue"
         }
 
+    /// return the length of the queue
     member x.count () = 
         async { 
             logger.Info "getting queue length for queue %s" name
@@ -421,6 +472,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             return [| waitLength.Result; pausedLength.Result; |] |> Seq.max
         }
     
+    /// empty the queue doesn't remove the jobs just removes the wait list so it won't do anything else.
     member x.empty () = 
         async { 
             logger.Info "emptying queue %s" name
@@ -436,10 +488,15 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             jobKeys |> Seq.iter (fun k -> multi2.KeyDeleteAsync(valueToKeyLong k) |> ignore)
             return! multi2.ExecuteAsync () |> Async.AwaitTask
         }
-
+    
+    /// move job from one list to another atomically
     member x.moveJob (src, dest) = 
         this.client().ListRightPopLeftPushAsync(src, dest) |> Async.AwaitTask
+
+    /// get a job by it's id
     member x.getJob id = Job<'a>.fromId (this, id)
+
+    /// get all jobs from the queue
     member x.getJobs (queueType, ?isList, ?start, ?stop) =
         async {
             logger.Info "getting %s jobs for queue %s" queueType name
@@ -455,9 +512,14 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 |> Seq.map this.getJob
                 |> Async.Parallel
         }
+
+    /// get all failed jobs
     member x.getFailed () = this.getJobs "failed"
+    /// get all completed jobs
     member x.getCompleted () = this.getJobs "completed"
+    /// get waiting jobs
     member x.getWaiting () = this.getJobs ("wait", true)
+    /// get active jobs
     member x.getActive () = this.getJobs ("active", true)
         
     //Events
