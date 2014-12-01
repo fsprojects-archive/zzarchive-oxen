@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>Queue<'a> - oxen</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content=""/>
+    <meta name="author" content="Curit"/>
+
+    <script src="https://code.jquery.com/jquery-1.8.0.js"></script>
+    <script src="https://code.jquery.com/ui/1.8.23/jquery-ui.js"></script>
+    <script src="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/js/bootstrap.min.js"></script>
+    <link href="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/css/bootstrap-combined.min.css" rel="stylesheet"/>
+
+    <link type="text/css" rel="stylesheet" href="/oxen/content/style.css" />
+    <script type="text/javascript" src="/oxen/content/tips.js"></script>
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="https://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="container">
+      <div class="masthead">
+        <ul class="nav nav-pills pull-right">
+          <li><a href="http://fsharp.org">fsharp.org</a></li>
+          <li><a href="http://github.com/curit/oxen">github page</a></li>
+        </ul>
+        <h3 class="muted"><a href="/oxen/index.html">oxen</a></h3>
+      </div>
+      <hr />
+      <div class="row">
+        <div class="span9" id="main">
+          
+
+
+
+<h1>Queue<'a></h1>
+<div class="xmldoc">
+<p>The queue</p>
+</div>
+  <h3>Constructors</h3>
+  <table class="table table-bordered member-list">
+    <thead>
+      <tr><td>Constructor</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '34', 34)" onmouseover="showTip(event, '34', 34)">
+            new(...)
+          </code>
+          <div class="tip" id="34">
+            <strong>Signature:</strong> (name:string * dbFactory:(unit -&gt; IDatabase) * subscriberFactory:(unit -&gt; ISubscriber) * forceSequentialProcessing:bool option) -&gt; Queue&lt;&#39;a&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L289-289" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <h3>Instance members</h3>
+  <table class="table table-bordered member-list">
+    <thead>
+      <tr><td>Instance member</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '35', 35)" onmouseover="showTip(event, '35', 35)">
+            add(data, opts)
+          </code>
+          <div class="tip" id="35">
+            <strong>Signature:</strong> (data:&#39;a * opts:Map&lt;string,string&gt; option) -&gt; Async&lt;Job&lt;&#39;a&gt;&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L415-415" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>add a job to the queue.</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '36', 36)" onmouseover="showTip(event, '36', 36)">
+            count()
+          </code>
+          <div class="tip" id="36">
+            <strong>Signature:</strong> unit -&gt; Async&lt;int64&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L470-470" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>return the length of the queue</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '37', 37)" onmouseover="showTip(event, '37', 37)">
+            empty()
+          </code>
+          <div class="tip" id="37">
+            <strong>Signature:</strong> unit -&gt; Async&lt;bool&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L481-481" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>empty the queue doesn't remove the jobs just removes the wait list so it won't do anything else.</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '38', 38)" onmouseover="showTip(event, '38', 38)">
+            getActive()
+          </code>
+          <div class="tip" id="38">
+            <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L528-528" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get active jobs</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '39', 39)" onmouseover="showTip(event, '39', 39)">
+            getCompleted()
+          </code>
+          <div class="tip" id="39">
+            <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L524-524" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get all completed jobs</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '40', 40)" onmouseover="showTip(event, '40', 40)">
+            getFailed()
+          </code>
+          <div class="tip" id="40">
+            <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L522-522" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get all failed jobs</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '41', 41)" onmouseover="showTip(event, '41', 41)">
+            getJob(id)
+          </code>
+          <div class="tip" id="41">
+            <strong>Signature:</strong> id:int64 -&gt; Async&lt;Job&lt;&#39;a&gt;&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L502-502" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get a job by it's id</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '42', 42)" onmouseover="showTip(event, '42', 42)">
+            getJobs(queueType, isList, start, stop)
+          </code>
+          <div class="tip" id="42">
+            <strong>Signature:</strong> (queueType:string * isList:bool option * start:int64 option * stop:int64 option) -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L505-505" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get all jobs from the queue</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '43', 43)" onmouseover="showTip(event, '43', 43)">
+            getWaiting()
+          </code>
+          <div class="tip" id="43">
+            <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L526-526" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get waiting jobs</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '44', 44)" onmouseover="showTip(event, '44', 44)">
+            moveJob(src, dest)
+          </code>
+          <div class="tip" id="44">
+            <strong>Signature:</strong> (src:RedisKey * dest:RedisKey) -&gt; Async&lt;RedisValue&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L498-498" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>move job from one list to another atomically</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '45', 45)" onmouseover="showTip(event, '45', 45)">
+            name
+          </code>
+          <div class="tip" id="45">
+            <strong>Signature:</strong> string<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L398-398" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>the name of the queue use this to uniquely identify the queue. (note: will be used in the redis keys like "bull:<queuename>:wait"</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '46', 46)" onmouseover="showTip(event, '46', 46)">
+            on
+          </code>
+          <div class="tip" id="46">
+            <strong>Signature:</strong> Events&lt;&#39;a&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L531-531" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '47', 47)" onmouseover="showTip(event, '47', 47)">
+            pause()
+          </code>
+          <div class="tip" id="47">
+            <strong>Signature:</strong> unit -&gt; Async&lt;bool&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L443-443" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>pause the queue
+note: (waits for the last job to finish before pausing the queue.)
+note 2: (this turns a bit akward when the jobs run in parallel so it might just do two more jobs before it pauses, but it will pause I promise)</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '48', 48)" onmouseover="showTip(event, '48', 48)">
+            process(handler)
+          </code>
+          <div class="tip" id="48">
+            <strong>Signature:</strong> (handler:(Job&lt;&#39;a&gt; -&gt; Async&lt;unit&gt;)) -&gt; unit<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L401-401" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>start the queue. 
+Takes handler: <code>Job&lt;'a&gt; -&gt; Async&lt;unit&gt;</code> that will be called for every job this queue handles.</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '49', 49)" onmouseover="showTip(event, '49', 49)">
+            resume(handler)
+          </code>
+          <div class="tip" id="49">
+            <strong>Signature:</strong> (handler:(Job&lt;&#39;a&gt; -&gt; Async&lt;unit&gt;)) -&gt; Async&lt;unit&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L458-458" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>resume a paused queue</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '50', 50)" onmouseover="showTip(event, '50', 50)">
+            run(handler)
+          </code>
+          <div class="tip" id="50">
+            <strong>Signature:</strong> (handler:(Job&lt;&#39;a&gt; -&gt; Async&lt;unit&gt;)) -&gt; Async&lt;unit&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L408-408" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>run the handler. 
+note: (you should probably use: <code>process</code> but if you want to keep the returned async to control it cancel it for example, use this.)
+note 2: (async switches to a different thread)</p>
+
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+        </div>
+        <div class="span3">
+          <img src="/oxen/img/logo.png" alt="F# Project" style="width:150px;margin:10px" />  
+          <ul class="nav nav-list" id="menu" style="margin-top: 20px;">
+            <li class="nav-header">oxen</li>
+            <li><a href="/oxen/index.html">Home page</a></li>
+            <li class="divider"></li>
+            <li><a href="http://nuget.org/packages/oxen">Get Library via NuGet</a></li>
+            <li><a href="http://github.com/curit/oxen">Source Code on GitHub</a></li>
+            <li><a href="http://github.com/curit/oxen/blob/master/LICENSE.txt">License</a></li>
+            <li><a href="http://github.com/curit/oxen/blob/master/RELEASE_NOTES.md">Release Notes</a></li>
+            
+            <li class="nav-header">Getting started</li>
+            <li><a href="/oxen/tutorial.html">Sample tutorial</a></li>
+
+            <li class="nav-header">Documentation</li>
+            <li><a href="/oxen/reference/index.html">API Reference</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <a href="http://github.com/curit/oxen"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"/></a>
+  </body>
+  </html>
