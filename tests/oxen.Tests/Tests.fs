@@ -16,6 +16,10 @@ type Data = {
     value: string
 }
 
+type OtherData = {
+    Value: string
+}
+
 let taskUnit () = Task.Factory.StartNew(fun () -> ())
 let taskIncr () = Task.Factory.StartNew(fun () -> 1L)
 let taskLPush () = Task.Factory.StartNew(fun () -> 1L)
@@ -381,6 +385,31 @@ type QueueFixture () =
                 (active |> Array.length) |> should equal 0
                 (completed |> Array.length) |> should equal 1
             } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should serialize json camelCase`` () = 
+            // Given
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+            let queue = Queue<OtherData>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+            let newJob = ref false
+            do queue.``process`` (fun j -> async { newJob := true })
+            
+            async {
+                // When
+                do queue.add({Value = "test"}) |> Async.Ignore |> Async.Start
+                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
+                let! active = queue.getActive()
+                let! completed = queue.getCompleted()
+
+                // Then
+                !newJob |> should be True
+                let key = queue.toKey("1")
+                let hash = mp.GetDatabase().HashGetAll(key)
+                hash.[0].Value |> fromValueStr |> should equal "{\"value\":\"test\"}"
+                (active |> Array.length) |> should equal 0
+                (completed |> Array.length) |> should equal 1
+            } |> Async.RunSynchronously
+
 
         [<Fact>]
         let ``should process stalled jobs when queue starts`` () = 
