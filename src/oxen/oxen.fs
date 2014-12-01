@@ -31,10 +31,10 @@ module OxenConvenience =
 
     /// <summary>
     /// Option coalesing operator 
-    /// <c>
+    /// `
     /// None |? 4 -> 4
     /// Some 4 |? 3 -> 4
-    /// </c>
+    /// `
     /// </summary>
     let (|?) (x: 'a option) (y: 'a) =  match x with | None -> y | Some z -> z
 
@@ -66,10 +66,15 @@ type EventType =
 /// A job that can be added to the queue. Where the generic type specifies the type of the data property
 type Job<'a> = 
     {
+        /// the queue the job belongs to
         queue: Queue<'a>
+        /// the data of the job
         data: 'a
+        /// the job Id
         jobId: int64
+        /// the job options
         opts: Map<string,string> option
+        /// the progress
         _progress: int
     }
     static member private logger = LogManager.getLogger()
@@ -124,8 +129,8 @@ type Job<'a> =
             this._logger.Info "taking lock with token %A for job %i renewed %b" token this.jobId (renew |? false)
             let nx = match renew with 
                      | Some x when x -> When.NotExists
-                     | Some x when not(x) -> When.Always 
-                     | None -> When.Always     
+                     | _ -> When.Always 
+            
             let value = (token.ToString ()) |> toValueStr
             let client:IDatabase = this.queue.client()
             return! 
