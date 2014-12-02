@@ -128,8 +128,9 @@ type Job<'a> =
         async {
             this._logger.Info "taking lock with token %A for job %i renewed %b" token this.jobId (renew |? false)
             let nx = match renew with 
-                     | Some x when x -> When.NotExists
-                     | _ -> When.Always 
+                     | Some x when x -> When.Always
+                     | _ -> When.NotExists
+                     
             
             let value = (token.ToString ()) |> toValueStr
             let client:IDatabase = this.queue.client()

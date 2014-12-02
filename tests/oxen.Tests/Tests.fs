@@ -99,7 +99,7 @@ type JobFixture () =
 
         // Then
         taken |> should be True
-        verify <@ db.StringSetAsync (any(), any(), any(), any()) @> once
+        verify <@ db.StringSetAsync (any(), any(), any(), When.NotExists) @> once
 
     
     [<Fact>]
@@ -126,7 +126,7 @@ type JobFixture () =
 
         // Then
         taken |> should be True
-        verify <@ db.StringSetAsync (any(), any(), any(), When.NotExists) @> once
+        verify <@ db.StringSetAsync (any(), any(), any(), When.Always) @> once
 
     [<Fact>]
     let ``should be able to move job to completed`` () = 
