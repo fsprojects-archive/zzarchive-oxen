@@ -273,12 +273,12 @@ Target "All" DoNothing
   ==> "BuildStackExchangeRedis"
   #endif
   ==> "Build"
-  ==> "RunNpmInstall"
-  ==> "StartTestControlQueue"
   #if MONO 
   #else
   ==> "StartRedis"
   #endif
+  ==> "RunNpmInstall"
+  ==> "StartTestControlQueue"
   ==> "RunTests"
   =?> ("GenerateReferenceDocs",isLocalBuild && not isMono)
   =?> ("GenerateDocs",isLocalBuild && not isMono)
