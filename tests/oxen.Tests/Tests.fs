@@ -644,3 +644,32 @@ type QueueFixture () =
                 completed.Length |> should equal 100
 
             } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``it should be possible to ensure delivery of a job to more than one listener`` () = ()
+
+        [<Fact>]
+        let ``it should be possible to ensure delivery of a job to more than one group of listeners`` () = ()
+
+        [<Fact>]
+        let ``it should ensure that in a group of listeners only one listener processes the job`` () = ()
+
+        [<Fact>]
+        let ``a listener should be able to register itself in a group`` () = ()
+
+        [<Fact>]
+        let ``a group should be created if a listener registers itself for a topic with an group identifier that does not exist`` () = ()
+
+        [<Fact>]
+        let ``a group should be removed if there are no more listeners registered`` () = ()
+
+        [<Fact>]
+        let ``a listener should be added to a group if it registers with a group identifier that already exists`` () = ()
+
+        [<Fact>]
+        let ``the api stays the same except for the extra topic id`` () = ()
+
+        // could call listeners subscribers, a group of listeners a subscription and a group of subscriptions about the same thing a topic
+        // how does this translate to jobs?
+        // a job is put on a queue for a worker, there can be a pool of workers listening for jobs, 
+        // bull:topic:queue:id or bull:queue:id
