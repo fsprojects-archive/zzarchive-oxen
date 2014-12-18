@@ -211,7 +211,7 @@ type QueueFixture () =
         let result = queue.toKey("stuff")
 
         // Then
-        result.ToString() |> should equal "bull:stuff:stuff"
+        result |> should equal (RedisKey.op_Implicit ("bull:stuff:stuff"))
 
     [<Fact>]
     let ``report progress and listen to event on queue`` () =
