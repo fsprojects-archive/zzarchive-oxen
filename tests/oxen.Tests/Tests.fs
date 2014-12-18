@@ -27,6 +27,7 @@ let taskLong () = Task.Factory.StartNew(fun () -> 1L)
 let taskTrue () = Task.Factory.StartNew(fun () -> true)
 let taskFalse () = Task.Factory.StartNew(fun () -> false)
 let taskRedisResult () = Task.Factory.StartNew(fun () -> Mock<RedisResult>().Create());
+/// change default hash set order to check independence of field order
 let taskJobHash () = Task.Factory.StartNew(fun () -> 
     [|
         HashEntry(toValueStr "opts", toValueStr "")
