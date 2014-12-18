@@ -29,8 +29,8 @@ let taskFalse () = Task.Factory.StartNew(fun () -> false)
 let taskRedisResult () = Task.Factory.StartNew(fun () -> Mock<RedisResult>().Create());
 let taskJobHash () = Task.Factory.StartNew(fun () -> 
     [|
-        HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "opts", toValueStr "")
+        HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "progress", toValueI32 1)
     |])
 
