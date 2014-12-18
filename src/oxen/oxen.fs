@@ -38,6 +38,10 @@ module OxenConvenience =
     /// </summary>
     let (|?) (x: 'a option) (y: 'a) =  match x with | None -> y | Some z -> z
 
+    /// get the entry from the hash that correspons with the name
+    let getHashEntryByName (hash: HashEntry array) name =
+        hash |> Seq.find (fun h -> h.Name |> fromValueStr = name)
+         
     /// lock renew time = 5000 milliseconds
     let LOCK_RENEW_TIME = 5000.0   
 
@@ -209,12 +213,13 @@ type Job<'a> =
         async {
             let client = queue.client
             let! job = client().HashGetAllAsync (queue.toKey(jobId.ToString())) |> Async.AwaitTask
+            let jobHash = job |> getHashEntryByName 
             return Job.fromData (
                 queue, 
                 jobId,
-                job.[0].Value |> fromValueStr, 
-                job.[1].Value |> fromValueStr, 
-                job.[2].Value |> fromValueI32) 
+                jobHash("data").Value |> fromValueStr, 
+                jobHash("opts").Value |> fromValueStr, 
+                jobHash("progress").Value |> fromValueI32) 
         }
     /// create a job from a redis hash
     static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int) =

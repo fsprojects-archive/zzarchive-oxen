@@ -27,10 +27,11 @@ let taskLong () = Task.Factory.StartNew(fun () -> 1L)
 let taskTrue () = Task.Factory.StartNew(fun () -> true)
 let taskFalse () = Task.Factory.StartNew(fun () -> false)
 let taskRedisResult () = Task.Factory.StartNew(fun () -> Mock<RedisResult>().Create());
+/// change default hash set order to check independence of field order
 let taskJobHash () = Task.Factory.StartNew(fun () -> 
     [|
-        HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "opts", toValueStr "")
+        HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "progress", toValueI32 1)
     |])
 
@@ -210,7 +211,7 @@ type QueueFixture () =
         let result = queue.toKey("stuff")
 
         // Then
-        result.ToString() |> should equal "bull:stuff:stuff"
+        result |> should equal (RedisKey.op_Implicit ("bull:stuff:stuff"))
 
     [<Fact>]
     let ``report progress and listen to event on queue`` () =
