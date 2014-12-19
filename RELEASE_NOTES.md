@@ -11,3 +11,6 @@
 * fix bug with lock renewal
 * serializes json to camelcase
 * adds some docs
+
+#### 0.0.4 - released
+* fix dependencies add dependency to Newtonsoft.Json

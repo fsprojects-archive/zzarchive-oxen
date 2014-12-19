@@ -216,6 +216,7 @@ Target "NuGet" (fun _ ->
                 [
                     "StackExchange.Redis", GetPackageVersion "./packages/" "StackExchange.Redis"
                     "log4net",  GetPackageVersion "./packages/" "log4net"
+                    "Newtonsoft.Json", GetPackageVersion "./packages" "Newtonsoft.Json"
                 ]
         })
         ("nuget/" + project + ".nuspec")
