@@ -194,11 +194,11 @@ type Job<'a> =
     member this.moveToFailed () = this.moveToSet("failed")
     
     /// see if the job is completed.
-    member this.isCompleted = this.isDone("completed");
+    member this.isCompleted = this.isDone("completed")
     
-    /// see if job failed.
-    member this.isFailed = this.isDone("failed");
-    
+    /// see if job failed
+    member this.isFailed = this.isDone("failed")
+   
     /// create a new job (note: The job will be stored in redis but it won't be added to the waiting list. You should probably use `Queue.add`)
     static member create (queue, jobId, data:'a, opts) = 
         async { 
@@ -275,7 +275,7 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
     interface IDisposable with
         member x.Dispose() =
             x.Dispose(true)
-            GC.SuppressFinalize(x);
+            GC.SuppressFinalize(x)
 
     member x.Dispose(disposing) = 
         logger.Debug "disposing lock renewer for job %i and token %A" job.jobId token
@@ -372,7 +372,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             let! lock = job.takeLock token
             match lock with
             | true -> 
-                let key = this.toKey("completed");
+                let key = this.toKey("completed")
                 let! contains = 
                     this.client().SetContainsAsync (key, job.jobId |> toValueI64) 
                     |> Async.AwaitTask
@@ -424,7 +424,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             logger.Info "adding job %i to the queue %s" jobId name
             let! job = Job<'a>.create (this, jobId, data, opts) 
             let key = this.toKey "wait"
-            let multi = this.client().CreateTransaction();
+            let multi = this.client().CreateTransaction()
 
             let res = 
                 match opts with
@@ -549,14 +549,14 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         async {
             logger.Info "emitting new queue-event %A for queue %s" eventType name
             match eventType with 
-            | Paused -> pausedEvent.Trigger({ queue = this });
-            | Resumed -> resumedEvent.Trigger({ queue = this });
+            | Paused -> pausedEvent.Trigger({ queue = this })
+            | Resumed -> resumedEvent.Trigger({ queue = this })
             | _ -> failwith "Not a queue event!"
         }
 
     member internal x.emitNewJobEvent jobId =
         async {
-            newJobEvent.Trigger({ jobId = jobId });
+            newJobEvent.Trigger({ jobId = jobId })
         }
 
     member internal x.emitJobEvent (eventType, job:Job<'a>, ?value, ?exn, ?data) = 
