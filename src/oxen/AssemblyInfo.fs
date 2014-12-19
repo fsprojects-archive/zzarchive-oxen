@@ -5,10 +5,10 @@ open System.Runtime.CompilerServices
 [<assembly: AssemblyTitleAttribute("oxen")>]
 [<assembly: AssemblyProductAttribute("oxen")>]
 [<assembly: AssemblyDescriptionAttribute("fsharp implementation of Optimalbits/bull")>]
-[<assembly: AssemblyVersionAttribute("0.0.2")>]
-[<assembly: AssemblyFileVersionAttribute("0.0.2")>]
+[<assembly: AssemblyVersionAttribute("0.0.3")>]
+[<assembly: AssemblyFileVersionAttribute("0.0.3")>]
 [<assembly: InternalsVisibleToAttribute("oxen.Tests")>]
 do ()
 
 module internal AssemblyVersionInformation =
-    let [<Literal>] Version = "0.0.2"
+    let [<Literal>] Version = "0.0.3"
