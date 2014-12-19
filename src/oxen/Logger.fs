@@ -5,7 +5,7 @@
     open log4net
    
     // log4f
-    type Logger(logger: ILog) =
+    type internal Logger(logger: ILog) =
 
         do log4net.Config.XmlConfigurator.ConfigureAndWatch (FileInfo "log4net.config") |> ignore
 
@@ -24,7 +24,7 @@
         member __.Fatal x = Printf.kprintf logger.Fatal x
         member __.Fatal ((ex: Exception), x) = Printf.kprintf (fun x -> logger.Fatal(x, ex)) x
     
-    module LogManager =
+    module internal LogManager =
         let getNamedLogger (name: string) = new Logger(LogManager.GetLogger(name))
         let getLogger() = 
             let st = StackTrace()

@@ -16,6 +16,10 @@ type Data = {
     value: string
 }
 
+type OtherData = {
+    Value: string
+}
+
 let taskUnit () = Task.Factory.StartNew(fun () -> ())
 let taskIncr () = Task.Factory.StartNew(fun () -> 1L)
 let taskLPush () = Task.Factory.StartNew(fun () -> 1L)
@@ -23,10 +27,11 @@ let taskLong () = Task.Factory.StartNew(fun () -> 1L)
 let taskTrue () = Task.Factory.StartNew(fun () -> true)
 let taskFalse () = Task.Factory.StartNew(fun () -> false)
 let taskRedisResult () = Task.Factory.StartNew(fun () -> Mock<RedisResult>().Create());
+/// change default hash set order to check independence of field order
 let taskJobHash () = Task.Factory.StartNew(fun () -> 
     [|
-        HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "opts", toValueStr "")
+        HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "progress", toValueI32 1)
     |])
 
@@ -95,7 +100,7 @@ type JobFixture () =
 
         // Then
         taken |> should be True
-        verify <@ db.StringSetAsync (any(), any(), any(), any()) @> once
+        verify <@ db.StringSetAsync (any(), any(), any(), When.NotExists) @> once
 
     
     [<Fact>]
@@ -122,7 +127,7 @@ type JobFixture () =
 
         // Then
         taken |> should be True
-        verify <@ db.StringSetAsync (any(), any(), any(), When.NotExists) @> once
+        verify <@ db.StringSetAsync (any(), any(), any(), When.Always) @> once
 
     [<Fact>]
     let ``should be able to move job to completed`` () = 
@@ -206,7 +211,7 @@ type QueueFixture () =
         let result = queue.toKey("stuff")
 
         // Then
-        result.ToString() |> should equal "bull:stuff:stuff"
+        result |> should equal (RedisKey.op_Implicit ("bull:stuff:stuff"))
 
     [<Fact>]
     let ``report progress and listen to event on queue`` () =
@@ -381,6 +386,31 @@ type QueueFixture () =
                 (active |> Array.length) |> should equal 0
                 (completed |> Array.length) |> should equal 1
             } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should serialize json camelCase`` () = 
+            // Given
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+            let queue = Queue<OtherData>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+            let newJob = ref false
+            do queue.``process`` (fun j -> async { newJob := true })
+            
+            async {
+                // When
+                do queue.add({Value = "test"}) |> Async.Ignore |> Async.Start
+                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
+                let! active = queue.getActive()
+                let! completed = queue.getCompleted()
+
+                // Then
+                !newJob |> should be True
+                let key = queue.toKey("1")
+                let hash = mp.GetDatabase().HashGetAll(key)
+                hash.[0].Value |> fromValueStr |> should equal "{\"value\":\"test\"}"
+                (active |> Array.length) |> should equal 0
+                (completed |> Array.length) |> should equal 1
+            } |> Async.RunSynchronously
+
 
         [<Fact>]
         let ``should process stalled jobs when queue starts`` () = 
@@ -615,3 +645,32 @@ type QueueFixture () =
                 completed.Length |> should equal 100
 
             } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``it should be possible to ensure delivery of a job to more than one listener`` () = ()
+
+        [<Fact>]
+        let ``it should be possible to ensure delivery of a job to more than one group of listeners`` () = ()
+
+        [<Fact>]
+        let ``it should ensure that in a group of listeners only one listener processes the job`` () = ()
+
+        [<Fact>]
+        let ``a listener should be able to register itself in a group`` () = ()
+
+        [<Fact>]
+        let ``a group should be created if a listener registers itself for a topic with an group identifier that does not exist`` () = ()
+
+        [<Fact>]
+        let ``a group should be removed if there are no more listeners registered`` () = ()
+
+        [<Fact>]
+        let ``a listener should be added to a group if it registers with a group identifier that already exists`` () = ()
+
+        [<Fact>]
+        let ``the api stays the same except for the extra topic id`` () = ()
+
+        // could call listeners subscribers, a group of listeners a subscription and a group of subscriptions about the same thing a topic
+        // how does this translate to jobs?
+        // a job is put on a queue for a worker, there can be a pool of workers listening for jobs, 
+        // bull:topic:queue:id or bull:queue:id

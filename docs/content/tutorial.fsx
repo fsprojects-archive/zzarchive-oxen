@@ -4,16 +4,20 @@
 #I "../../bin"
 
 (**
-Introducing your project
+Getting started
 ========================
 
-Say more
+oxen is an f# implementation of Optimalbits bull queue for node. Based on redis which inturn is inspired on Kue.
+
+
 
 *)
-#r "FSharp.ProjectTemplate.dll"
-open FSharp.ProjectTemplate
+#r "oxen.dll"
+#r "StackExchange.Redis.dll"
+open oxen
+open StackExchange.Redis
 
-Library.hello 0
+
 (**
 Some more info
 *)

@@ -5,3 +5,9 @@
 * fix dependencies
 * fix links in nuspec
 
+#### 0.0.3 - released
+* make logger internal
+* fix bug in getting job from queue hash
+* fix bug with lock renewal
+* serializes json to camelcase
+* adds some docs
