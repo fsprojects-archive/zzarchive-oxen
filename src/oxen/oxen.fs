@@ -1,7 +1,6 @@
 ﻿namespace oxen
 
 open System
-open System.IO
 open System.Collections.Generic
 open System.Threading.Tasks
 open System.Threading
