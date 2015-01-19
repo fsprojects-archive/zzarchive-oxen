@@ -1,7 +1,6 @@
 ﻿namespace oxen
 
 open System
-open System.IO
 open System.Collections.Generic
 open System.Threading.Tasks
 open System.Threading
@@ -399,6 +398,10 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
             return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel |> Async.Ignore
         } 
+
+    /// create a new queue
+    new (name, mp:ConnectionMultiplexer) = 
+        Queue<'a>(name, mp.GetDatabase, mp.GetSubscriber)
 
     /// the name of the queue use this to uniquely identify the queue. (note: will be used in the redis keys like "bull:<queuename>:wait"
     member x.name = name

@@ -14,3 +14,6 @@
 
 #### 0.0.4 - released
 * fix dependencies add dependency to Newtonsoft.Json
+
+#### 0.0.5 - not released
+* add constructor to Queue<'a> for convenience
