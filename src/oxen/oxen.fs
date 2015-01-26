@@ -13,20 +13,20 @@ open Newtonsoft.Json.Serialization
 /// Convenience methods to interop with StackExchange.Redis
 [<AutoOpen>]
 module OxenConvenience = 
+    /// epoch
+    let epoch = new DateTime (1970,1,1)
     /// make RedisValue from string
     let toValueStr (x:string) = RedisValue.op_Implicit(x:string)
     /// make RedisValue from long
     let toValueI64 (x:int64) = RedisValue.op_Implicit(x:int64)
     /// make RedisValue from int
     let toValueI32 (x:int32) = RedisValue.op_Implicit(x:int32)
-    /// get string from RedisValue
-    let fromValueStr (x:RedisValue):string = string(x)
-    /// get long from RedisValue
-    let fromValueI64 (x:RedisValue):int64 = int64(x)
-    /// get int from RedisValue
-    let fromValueI32 (x:RedisValue):int = int(x)
+    /// make RedisValue from float
+    let toValueFloat (x:float) = RedisValue.op_Implicit(x:float)
     /// get RedisValue from RedisKey with a long in the middle
     let valueToKeyLong (x:RedisValue):RedisKey = RedisKey.op_Implicit(int64(x).ToString ())
+    /// get RedisChannel from RedisKey
+    let keyToChannel (x:RedisKey):RedisChannel = RedisChannel.op_Implicit(x.ToString())
 
     /// <summary>
     /// Option coalesing operator 
@@ -39,8 +39,15 @@ module OxenConvenience =
 
     /// get the entry from the hash that correspons with the name
     let getHashEntryByName (hash: HashEntry array) name =
-        hash |> Seq.find (fun h -> h.Name |> fromValueStr = name)
-         
+        hash |> Seq.tryFind (fun h -> h.Name |> string = name)
+    
+    /// calc unix time from millisecs since 1-1-1970
+    let toUnixTime (dt:DateTime) = (dt - epoch).TotalMilliseconds
+           
+    /// calc DateTime from millisecs since 1-1-1970
+    let fromUnixTime (dt:float) =
+         epoch + (dt |> TimeSpan.FromMilliseconds)
+        
     /// lock renew time = 5000 milliseconds
     let LOCK_RENEW_TIME = 5000.0   
 
@@ -66,6 +73,12 @@ type EventType =
     | Resumed
     | NewJob
 
+/// [omit]
+type ListType = 
+    | List
+    | Set
+    | SortedSet
+
 /// A job that can be added to the queue. Where the generic type specifies the type of the data property
 type Job<'a> = 
     {
@@ -79,6 +92,10 @@ type Job<'a> =
         opts: Map<string,string> option
         /// the progress
         _progress: int
+        /// delay
+        delay: float option
+        /// timestamp
+        timestamp: DateTime
     }
     static member private logger = LogManager.getLogger()
     member private this._logger = Job<'a>.logger
@@ -93,7 +110,14 @@ type Job<'a> =
             HashEntry(toValueStr "data", toValueStr jsData)
             HashEntry(toValueStr "opts", toValueStr jsOpts)
             HashEntry(toValueStr "progress", toValueI32 this._progress)
-        |]
+            HashEntry(toValueStr "timestamp", this.timestamp |> toUnixTime |> toValueFloat)
+        |] |> Array.append(
+            match this.delay with 
+            | None -> [||]
+            | Some d -> [| HashEntry(toValueStr "delay", toValueFloat d) |]
+        )
+
+
     /// report the progres of this job
     member this.progress progress = 
         async {
@@ -109,18 +133,19 @@ type Job<'a> =
     member this.remove () = 
         async { 
             this._logger.Info "removeing job %i" this.jobId
-            let script = 
-                "if (redis.call(\"SISMEMBER\", KEYS[4], ARGV[1]) == 0) and (redis.call(\"SISMEMBER\", KEYS[5], ARGV[1]) == 0) then\n\
-                  redis.call(\"LREM\", KEYS[1], 0, ARGV[1])\n\
-                  redis.call(\"LREM\", KEYS[2], 0, ARGV[1])\n\
-                  redis.call(\"LREM\", KEYS[3], 0, ARGV[1])\n\
-                end\n\
-                redis.call(\"SREM\", KEYS[4], ARGV[1])\n\
-                redis.call(\"SREM\", KEYS[5], ARGV[1])\n\
-                redis.call(\"DEL\", KEYS[6])\n"
+            let script =
+                "if (redis.call(\"SISMEMBER\", KEYS[5], ARGV[1]) == 0) and (redis.call(\"SISMEMBER\", KEYS[6], ARGV[1]) == 0) then\n
+                  redis.call(\"LREM\", KEYS[1], 0, ARGV[1])\n
+                  redis.call(\"LREM\", KEYS[2], 0, ARGV[1])\n
+                  redis.call(\"ZREM\", KEYS[3], ARGV[1])\n
+                  redis.call(\"LREM\", KEYS[4], 0, ARGV[1])\n
+                end\n
+                redis.call(\"SREM\", KEYS[5], ARGV[1])\n
+                redis.call(\"SREM\", KEYS[6], ARGV[1])\n
+                redis.call(\"DEL\", KEYS[7])\n"
 
             let keys = 
-                [| "active"; "wait"; "paused"; "completed"; "failed"; this.jobId.ToString() |]  
+                [| "active"; "wait"; "delayed"; "paused"; "completed"; "failed"; this.jobId.ToString() |]  
                 |> Array.map this.queue.toKey
 
             let client = this.queue.client ()
@@ -153,11 +178,11 @@ type Job<'a> =
         async {
             this._logger.Info "releasing lock with token %A for job %i" token this.jobId
             let script = 
-                "if redis.call(\"get\", KEYS[1]) == ARGV[1] \n\
-                then \n\
-                return redis.call(\"del\", KEYS[1]) \n\
-                else \n\
-                return 0 \n\
+                "if redis.call(\"get\", KEYS[1]) == ARGV[1] \n
+                then \n
+                return redis.call(\"del\", KEYS[1]) \n
+                else \n
+                return 0 \n
                 end \n"
 
             let! result = 
@@ -168,17 +193,53 @@ type Job<'a> =
                  ) |> Async.AwaitTask
             return int64(result)
         }
-    member private this.moveToSet set =
+
+    /// retry job
+    member this.retry () = 
+        async {
+            let client = this.queue.client ()
+            let failed = this.queue.toKey "failed"
+            let key = this.queue.toKey "wait"
+            let multi = client.CreateTransaction()
+            
+            do multi.SetRemoveAsync(failed, toValueI64 this.jobId) |> ignore
+            
+            let res = 
+                match this.opts with
+                | None -> multi.ListLeftPushAsync (key, toValueI64 this.jobId) 
+                | Some opts -> 
+                    if opts.ContainsKey "lifo" && bool.Parse (opts.Item "lifo") 
+                    then multi.ListRightPushAsync (key, toValueI64 this.jobId) 
+                    else multi.ListLeftPushAsync (key, toValueI64 this.jobId) 
+           
+            let result =  multi.PublishAsync (this.queue.toKey("jobs") |> keyToChannel, toValueI64 this.jobId)
+           
+            do! multi.ExecuteAsync() |> Async.AwaitTask |> Async.Ignore
+                       
+            if result.Result < 1L then failwith "must have atleast one subscriber, me"
+
+            return this
+        }
+
+    member private this.moveToSet (set, ?timestamp:float) =
         async {
             let queue = this.queue
-            let activeList = queue.toKey("active")
-            let dest = queue.toKey(set)
             let client:IDatabase = queue.client()
             let multi = client.CreateTransaction()
-            do multi.ListRemoveAsync (activeList, toValueI64 this.jobId) |> ignore
-            do multi.SetAddAsync (dest, toValueI64 this.jobId) |> ignore
+            let activeList = queue.toKey("active")
+            let dest = queue.toKey(set)
+            match timestamp with 
+            | None ->
+                do multi.ListRemoveAsync (activeList, toValueI64 this.jobId) |> ignore
+                do multi.SetAddAsync (dest, toValueI64 this.jobId) |> ignore
+            | Some t ->
+                let score = if t < 0. then 0. else t;
+                multi.SortedSetAddAsync(dest, toValueI64 this.jobId, score) |> ignore
+                multi.PublishAsync(dest |> keyToChannel, t |> toValueFloat) |> ignore
+
             return! multi.ExecuteAsync() |> Async.AwaitTask                        
         }
+
     member private this.isDone list =
         async {
             this._logger.Info "checking if job %i is done (%s)" this.jobId list
@@ -191,6 +252,9 @@ type Job<'a> =
 
     /// move this job to the failed list.
     member this.moveToFailed () = this.moveToSet("failed")
+
+    member this.moveToDelayed timestamp =
+        this.moveToSet ("delayed", timestamp)
     
     /// see if the job is completed.
     member this.isCompleted = this.isDone("completed")
@@ -201,12 +265,23 @@ type Job<'a> =
     /// create a new job (note: The job will be stored in redis but it won't be added to the waiting list. You should probably use `Queue.add`)
     static member create (queue, jobId, data:'a, opts) = 
         async { 
-            Job<_>.logger.Info "creating job for queue %s with id %i and data %A and options %A" (queue:Queue<'a>).name jobId data opts
-            let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0 }
+            Job<_>.logger.Info "creating job for queue %s with id %i and data %A and options %A" (queue:Queue<'a>).name jobId data (opts:Map<string, string> option)
+            let delay = 
+                match opts with 
+                | Some o when (o.ContainsKey "delay") -> Some (o.["delay"] |> Double.Parse)
+                | _ -> None
+
+            let timestamp = 
+                match opts with 
+                | Some o when (o.ContainsKey "timestamp") -> o.["timestamp"] |> Double.Parse |> fromUnixTime
+                | _ -> DateTime.Now
+
+            let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0; timestamp = timestamp; delay = delay }
             let client:IDatabase = queue.client()
             do! client.HashSetAsync (queue.toKey (jobId.ToString ()), job.toData ()) |> Async.awaitPlainTask
             return job 
         }
+
     /// get job from redis by job id and queue
     static member fromId<'a> (queue: Queue<'a>, jobId:int64) = 
         async {
@@ -216,18 +291,26 @@ type Job<'a> =
             return Job.fromData (
                 queue, 
                 jobId,
-                jobHash("data").Value |> fromValueStr, 
-                jobHash("opts").Value |> fromValueStr, 
-                jobHash("progress").Value |> fromValueI32) 
+                jobHash("data").Value.Value |> string, 
+                jobHash("opts").Value.Value |> string, 
+                jobHash("progress").Value.Value |> int,
+                jobHash("timestamp").Value.Value |> float,
+                match jobHash("delay") with
+                | None -> None
+                | Some x when x.Value |> string = "undefined" -> None
+                | Some x when x.Value |> float = 0. -> None
+                | Some x -> x.Value |> float |> Some)
         }
+
     /// create a job from a redis hash
-    static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int) =
+    static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int, timestamp: float, delay: float option) =
         let sData = JsonConvert.DeserializeObject<'a>(data)
         let sOpts = 
             match JsonConvert.DeserializeObject<Dictionary<string, string>>(opts) with 
             | null -> None
             | _ as x -> x |> Seq.map (fun kv -> (kv.Key, kv.Value)) |> Map.ofSeq |> Some
-        { queue = queue; data = sData; jobId = jobId; opts = sOpts; _progress = progress }
+        { queue = queue; data = sData; jobId = jobId; opts = sOpts; _progress = progress; delay = delay; timestamp = timestamp |> fromUnixTime }
+
 /// a job event 
 /// i.e.: Completed, Progress, Failed
 and OxenJobEvent<'a> =
@@ -301,19 +384,32 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     let mutable paused = false
     let mutable processing = false
+    let mutable delayedTimeStamp = Double.MaxValue
+    let mutable delayedJobsCancellationTokenSource = new CancellationTokenSource ()
+
+    let _toKey kind = RedisKey.op_Implicit ("bull:" + name + ":" + kind)
+
     
-    let channel = RedisChannel("bull:" + name + ":jobs", RedisChannel.PatternMode.Auto)
+    let newJobChannel = _toKey("jobs") |> keyToChannel 
+    let delayedJobChannel = _toKey("delayed") |> keyToChannel 
 
     let sub = subscriberFactory ()
     do sub.Subscribe(
-                channel,
+                newJobChannel,
                 (fun c v -> 
                     async {
-                        let jobId = fromValueI64(v)
+                        let jobId = v |> int64
                         return! this.emitNewJobEvent(jobId)
                     } |> Async.RunSynchronously))
     
-    do logger.Info "subscribed to %A" channel
+    do sub.Subscribe(
+                delayedJobChannel,
+                (fun c v -> 
+                    async {
+                        this.updateDelayTimer(v |> float)
+                    } |> Async.RunSynchronously))
+
+    do logger.Info "subscribed to %A" newJobChannel
 
 
     let token = Guid.NewGuid ()
@@ -348,7 +444,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         async {
             let! (gotIt:RedisValue) = this.moveJob(this.toKey("wait"), this.toKey("active")) 
             match gotIt with 
-            | g when g.HasValue -> return! this.getJob (fromValueI64 g)
+            | g when g.HasValue -> return! this.getJob (g |> int64)
             | _ -> 
                 do! onNewJob |> Async.AwaitEvent |> Async.Ignore
                 return! getNextJob ()
@@ -357,12 +453,18 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let rec processJobs handler = 
         async {
             let! job = getNextJob ()
-            match forceSequentialProcessing |? false with
-            | true -> do! processJob handler job
-            | false -> do processJob handler job |> Async.Start
-            
-            if not(paused) then 
+            match job.delay with 
+            | Some d -> 
+                let timestamp = (job.timestamp |> toUnixTime) + d |> float
+                do! job.moveToDelayed(timestamp) |> Async.Ignore
                 return! processJobs handler
+            | None ->  
+                match forceSequentialProcessing |? false with
+                | true -> do! processJob handler job
+                | false -> do processJob handler job |> Async.Start
+            
+                if not(paused) then 
+                    return! processJobs handler
         }
 
     let processStalledJob handler (job:Job<'a>) = 
@@ -390,7 +492,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 |> Async.AwaitTask
             let! jobs = 
                 range 
-                |> Seq.map fromValueI64
+                |> Seq.map int64
                 |> Seq.map (fun x -> Job.fromId (this, x))
                 |> Async.Parallel
 
@@ -405,6 +507,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     /// the name of the queue use this to uniquely identify the queue. (note: will be used in the redis keys like "bull:<queuename>:wait"
     member x.name = name
+
     /// start the queue. 
     /// Takes handler: `Job<'a> -> Async<unit>` that will be called for every job this queue handles.
     member x.``process`` (handler:Job<'a> -> Async<unit>) = 
@@ -421,8 +524,12 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         }
     
     /// add a job to the queue.
-    member x.add (data, ?opts:Map<string,string>) = 
+    member x.add (data, ?opts:(string * string) list) = 
         async {
+            let opts = 
+                match opts with 
+                | Some o -> Some (o |> Map.ofList)
+                | None -> None
             let! jobId = this.client().StringIncrementAsync (this.toKey "id") |> Async.AwaitTask
             logger.Info "adding job %i to the queue %s" jobId name
             let! job = Job<'a>.create (this, jobId, data, opts) 
@@ -437,7 +544,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                     then multi.ListRightPushAsync (key, toValueI64 jobId) 
                     else multi.ListLeftPushAsync (key, toValueI64 jobId) 
            
-            let result =  multi.PublishAsync (channel, toValueI64 jobId)
+            let result =  multi.PublishAsync (newJobChannel, toValueI64 jobId)
            
             do! multi.ExecuteAsync() |> Async.AwaitTask |> Async.Ignore
                        
@@ -511,30 +618,43 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     member x.getJob id = Job<'a>.fromId (this, id)
 
     /// get all jobs from the queue
-    member x.getJobs (queueType, ?isList, ?start, ?stop) =
+    member x.getJobs (queueType, listType:ListType, ?start, ?stop) =
         async {
             logger.Info "getting %s jobs for queue %s" queueType name
             let key = this.toKey(queueType)
-            let! jobsIds = 
-                match isList |? false with 
-                | true -> this.client().ListRangeAsync(key, (start |? 0L), (stop |? -1L)) |> Async.AwaitTask
-                | false -> this.client().SetMembersAsync(key) |> Async.AwaitTask
+            let! jobIds =
+                match listType with
+                | List -> 
+                    this.client().ListRangeAsync(key, (start |? 0L), (stop |? -1L)) |> Async.AwaitTask
+                | Set ->
+                    this.client().SetMembersAsync(key) |> Async.AwaitTask
+                | SortedSet ->
+                    this.client().SortedSetRangeByRankAsync(key, start|? 0L, stop |? -1L) |> Async.AwaitTask
 
             return!
-                jobsIds
-                |> Seq.map fromValueI64
+                jobIds
+                |> Seq.map int64
                 |> Seq.map this.getJob
                 |> Async.Parallel
         }
 
+    /// retry jobs
+    member x.retryJob (job:Job<'a>) = job.retry()
+
     /// get all failed jobs
-    member x.getFailed () = this.getJobs "failed"
+    member x.getFailed () = this.getJobs ("failed", Set)
     /// get all completed jobs
-    member x.getCompleted () = this.getJobs "completed"
+    member x.getCompleted () = this.getJobs ("completed", Set)
     /// get waiting jobs
-    member x.getWaiting () = this.getJobs ("wait", true)
+    member x.getWaiting () = this.getJobs ("wait", List)
     /// get active jobs
-    member x.getActive () = this.getJobs ("active", true)
+    member x.getActive () = this.getJobs ("active", List)
+    /// get active jobs
+    member x.getActive (start:int64, stop:int64) = this.getJobs ("active", List, start, stop)
+    /// get delayed jobs
+    member x.getDelayed () = this.getJobs ("delayed", SortedSet)
+    /// get delayed jobs
+    member x.getDelayed (start:int64, stop:int64) = this.getJobs ("delayed", List, start, stop)
         
     //Events
     member x.on = { 
@@ -546,8 +666,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     }
 
     //Internals
-    member internal x.toKey (kind:string) = RedisKey.op_Implicit ("bull:" + name + ":" + kind)
-        
+    member internal x.toKey kind = _toKey kind
     member internal x.emitQueueEvent (eventType) = 
         async {
             logger.Info "emitting new queue-event %A for queue %s" eventType name
@@ -577,6 +696,49 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             | Progress -> progressEvent.Trigger(eventData)
             | Failed -> failedEvent.Trigger(eventData)
             | _ -> failwith "Not a job event!"
+        }
+   
+    member internal x.updateDelayTimer timestamp =
+        if timestamp < delayedTimeStamp then
+            delayedJobsCancellationTokenSource.Cancel()
+            delayedJobsCancellationTokenSource <- new CancellationTokenSource()
+            delayedTimeStamp <- timestamp
+            let nextDelayedJob = timestamp - (DateTime.Now |> toUnixTime) |> int
+            let nextDelayedJob = if nextDelayedJob < 0 then 0 else nextDelayedJob
+            do Async.Start (async {
+                do! Async.Sleep nextDelayedJob
+                do! this.updateDelaySet delayedTimeStamp
+                delayedTimeStamp <- Double.MaxValue
+            }, delayedJobsCancellationTokenSource.Token)
+
+    member internal x.updateDelaySet timestamp =
+        async {
+            let script = " 
+                 local RESULT = redis.call(\"ZRANGE\", KEYS[1], 0, 0, \"WITHSCORES\")
+                 local jobId = RESULT[1]
+                 local score = RESULT[2]
+                 if (score ~= nil) then
+                  if (score <= ARGV[1]) then
+                   redis.call(\"ZREM\", KEYS[1], jobId)
+                   redis.call(\"LREM\", KEYS[2], 0, jobId)
+                   redis.call(\"RPUSH\", KEYS[3], jobId)
+                   redis.call(\"PUBLISH\", KEYS[4], jobId)
+                   redis.call(\"HSET\", KEYS[5] .. jobId, \"delay\", 0)
+                   local nextTimestamp = redis.call(\"ZRANGE\", KEYS[1], 0, 0, \"WITHSCORES\")[2]
+                   if(nextTimestamp ~= nil) then
+                    redis.call(\"PUBLISH\", KEYS[1], nextTimestamp)
+                   end
+                   return nextTimestamp
+                  end
+                 end"
+
+            let keys = [|"delayed"; "active"; "wait"; "jobs"; ""|] |> Array.map this.toKey
+            let client = this.client ()
+            let! res =
+                client.ScriptEvaluateAsync (script, keys, [|timestamp |> int64 |> toValueI64|]) 
+                |> Async.AwaitTask 
+                
+            ()
         }
 
     member internal x.client = dbFactory

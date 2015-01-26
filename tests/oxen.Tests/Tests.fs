@@ -16,6 +16,10 @@ type Data = {
     value: string
 }
 
+type Order = {
+    order: int
+}
+
 type OtherData = {
     Value: string
 }
@@ -33,6 +37,9 @@ let taskJobHash () = Task.Factory.StartNew(fun () ->
         HashEntry(toValueStr "opts", toValueStr "")
         HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
         HashEntry(toValueStr "progress", toValueI32 1)
+        HashEntry(toValueStr "delay", toValueFloat 0.)
+        HashEntry(toValueStr "timestamp", toValueFloat (DateTime.Now |> toUnixTime))
+        HashEntry(toValueStr "progress", toValueI32 1)
     |])
 
 let taskValues (value:int64) = Task.Factory.StartNew(fun () -> [| RedisValue.op_Implicit(value) |])
@@ -49,7 +56,7 @@ type JobFixture () =
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
         // When
-        let job = Job.fromData(q, 1L, "{ \"value\": \"test\" }", "", 1)
+        let job = Job.fromData(q, 1L, "{ \"value\": \"test\" }", "", 1, DateTime.Now |> toUnixTime, None)
 
         // Then
         job.data.value |> should equal "test"
@@ -93,6 +100,8 @@ type JobFixture () =
             data = { value = "string" }
             opts = None
             _progress = 0
+            delay = None
+            timestamp = DateTime.Now
         }
         
         // When
@@ -120,6 +129,8 @@ type JobFixture () =
             data = { value = "string" }
             opts = None
             _progress = 0
+            delay = None
+            timestamp = DateTime.Now
         }
         
         // When
@@ -406,7 +417,7 @@ type QueueFixture () =
                 !newJob |> should be True
                 let key = queue.toKey("1")
                 let hash = mp.GetDatabase().HashGetAll(key)
-                hash.[0].Value |> fromValueStr |> should equal "{\"value\":\"test\"}"
+                hash.[0].Value |> string |> should equal "{\"value\":\"test\"}"
                 (active |> Array.length) |> should equal 0
                 (completed |> Array.length) |> should equal 1
             } |> Async.RunSynchronously
@@ -505,7 +516,7 @@ type QueueFixture () =
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
 
-            let lifo = [("lifo", "true")] |> Map.ofList
+            let lifo = [("lifo", "true")] 
 
             async {
                 // When
@@ -645,6 +656,80 @@ type QueueFixture () =
                 completed.Length |> should equal 100
 
             } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should be able to retry a job`` () =
+            async {
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp)
+                let called = ref 0
+                queue.on.Failed.Add (fun j -> 
+                    j.job.retry() |> Async.RunSynchronously |> ignore
+                )
+                queue.``process`` (fun j ->
+                    async {
+                        Debug.Print ("processing job " + j.jobId.ToString ())
+                        called := !called + 1
+                        if !called % 2 = 1 then 
+                            failwith "Noooo!..... it be uneven!"
+                    })
+
+                let! job = queue.add({value = "test"});
+                do! waitForQueueToFinish queue
+                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
+                let! completed = job.isCompleted 
+                completed |> should be True
+                !called |> should equal 2
+            }|> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should process a delayed job only after delayed time`` () =
+            async {
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp)
+                let called = ref false
+                let delay = 500.
+                queue.``process`` (fun j -> async {
+                    let curDate = DateTime.Now
+                    j.timestamp.AddMilliseconds(delay) |> should lessThanOrEqualTo curDate
+                    called := true
+                })
+                let! job = queue.add({ value = "test"}, [("delay", delay |> string)])
+                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
+                let! delayed = queue.getDelayed () 
+                delayed.Length |> should equal 0
+                let! completed = queue.getCompleted () 
+                completed.Length |> should equal 1
+                !called |> should be True
+            } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should process delayed jobs in correct order`` () =
+            async {
+                let order = ref 0
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queue = Queue<Order>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+                queue.``process`` (fun j -> async {
+                    !order |> should lessThan j.data.order
+                    Debug.Print ("Order: " + j.data.order.ToString())
+                    order := j.data.order
+                    ()
+                })
+
+                do! queue.add({order = 1}, [("delay", "100")]) |> Async.Ignore
+                do! queue.add({order = 6}, [("delay", "1100")]) |> Async.Ignore
+                do! queue.add({order = 10}, [("delay", "1900")]) |> Async.Ignore
+                do! queue.add({order = 2}, [("delay", "300")]) |> Async.Ignore
+                do! queue.add({order = 9}, [("delay", "1700")]) |> Async.Ignore
+                do! queue.add({order = 5}, [("delay", "900")]) |> Async.Ignore
+                do! queue.add({order = 3}, [("delay", "500")]) |> Async.Ignore
+                do! queue.add({order = 7}, [("delay", "1300")]) |> Async.Ignore
+                do! queue.add({order = 4}, [("delay", "700")]) |> Async.Ignore
+                do! queue.add({order = 8}, [("delay", "1500")]) |> Async.Ignore
+                do! waitForQueueToFinish queue
+            } |> Async.RunSynchronously
+
+
 
         [<Fact>]
         let ``it should be possible to ensure delivery of a job to more than one listener`` () = ()
