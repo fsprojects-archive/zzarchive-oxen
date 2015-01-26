@@ -23,6 +23,14 @@ module OxenConvenience =
     let toValueI32 (x:int32) = RedisValue.op_Implicit(x:int32)
     /// make RedisValue from float
     let toValueFloat (x:float) = RedisValue.op_Implicit(x:float)
+    ///get int from RedisValue
+    let fromValueI32 (x:RedisValue):int = x |> int
+    ///get int64 from RedisValue
+    let fromValueI64 (x:RedisValue):int64 = x |> int64
+    ///get string from RedisValue
+    let fromValueString (x:RedisValue):string = x |> string
+    ///get float from RedisValue
+    let fromValueFloat (x:RedisValue):float = x |> float
     /// get RedisValue from RedisKey with a long in the middle
     let valueToKeyLong (x:RedisValue):RedisKey = RedisKey.op_Implicit(int64(x).ToString ())
     /// get RedisChannel from RedisKey
@@ -39,7 +47,7 @@ module OxenConvenience =
 
     /// get the entry from the hash that correspons with the name
     let getHashEntryByName (hash: HashEntry array) name =
-        hash |> Seq.tryFind (fun h -> h.Name |> string = name)
+        hash |> Seq.tryFind (fun h -> h.Name |> fromValueString = name)
     
     /// calc unix time from millisecs since 1-1-1970
     let toUnixTime (dt:DateTime) = (dt - epoch).TotalMilliseconds
@@ -291,15 +299,15 @@ type Job<'a> =
             return Job.fromData (
                 queue, 
                 jobId,
-                jobHash("data").Value.Value |> string, 
-                jobHash("opts").Value.Value |> string, 
-                jobHash("progress").Value.Value |> int,
-                jobHash("timestamp").Value.Value |> float,
+                jobHash("data").Value.Value |> fromValueString, 
+                jobHash("opts").Value.Value |> fromValueString, 
+                jobHash("progress").Value.Value |> fromValueI32,
+                jobHash("timestamp").Value.Value |> fromValueFloat,
                 match jobHash("delay") with
                 | None -> None
-                | Some x when x.Value |> string = "undefined" -> None
-                | Some x when x.Value |> float = 0. -> None
-                | Some x -> x.Value |> float |> Some)
+                | Some x when x.Value |> fromValueString = "undefined" -> None
+                | Some x when x.Value |> fromValueFloat = 0. -> None
+                | Some x -> x.Value |> fromValueFloat |> Some)
         }
 
     /// create a job from a redis hash
@@ -398,7 +406,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 newJobChannel,
                 (fun c v -> 
                     async {
-                        let jobId = v |> int64
+                        let jobId = v |> fromValueI64
                         return! this.emitNewJobEvent(jobId)
                     } |> Async.RunSynchronously))
     
@@ -406,7 +414,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 delayedJobChannel,
                 (fun c v -> 
                     async {
-                        this.updateDelayTimer(v |> float)
+                        this.updateDelayTimer(v |> fromValueFloat)
                     } |> Async.RunSynchronously))
 
     do logger.Info "subscribed to %A" newJobChannel
@@ -444,7 +452,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         async {
             let! (gotIt:RedisValue) = this.moveJob(this.toKey("wait"), this.toKey("active")) 
             match gotIt with 
-            | g when g.HasValue -> return! this.getJob (g |> int64)
+            | g when g.HasValue -> return! this.getJob (g |> fromValueI64)
             | _ -> 
                 do! onNewJob |> Async.AwaitEvent |> Async.Ignore
                 return! getNextJob ()
