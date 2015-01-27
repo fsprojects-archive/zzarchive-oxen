@@ -357,7 +357,7 @@ type QueueFixture () =
         let waitForQueueToFinish (queue:Queue<_>) = 
             let rec wait () = 
                 async {
-                    do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
+                    do! Async.SwitchToNewThread ()
                     let! waiting = queue.getWaiting()
                     let! active = queue.getActive()
                     match waiting.Length + active.Length with
@@ -367,14 +367,9 @@ type QueueFixture () =
             wait ()
 
         let waitForJobsToArrive (queue:Queue<_>) = 
-            let event = new Event<unit>();
-            let onMsg = event.Publish
-            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
-            do mp.GetSubscriber().Subscribe(RedisChannel.op_Implicit(RedisKey.op_Implicit(queue.toKey("jobs")):string), (fun _ _ -> event.Trigger()))
-            
             let rec wait () =
                 async {
-                    do! onMsg |> Async.AwaitEvent
+                    do! Async.SwitchToNewThread ()
                     let! count = queue.count()
                     match count with
                     | x when x = 0L -> return! wait ()
@@ -680,7 +675,6 @@ type QueueFixture () =
                     })
 
                 let! job = queue.add({value = "test"});
-                do! waitForQueueToFinish queue
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
                 let! completed = job.isCompleted 
                 completed |> should be True
