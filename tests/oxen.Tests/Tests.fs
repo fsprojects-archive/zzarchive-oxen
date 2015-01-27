@@ -355,24 +355,13 @@ type QueueFixture () =
             
 
         let waitForQueueToFinish (queue:Queue<_>) = 
+            let db = mp.GetDatabase ()
             let rec wait () = 
                 async {
-                    do! Async.SwitchToNewThread ()
                     let! waiting = queue.getWaiting()
                     let! active = queue.getActive()
                     match waiting.Length + active.Length with
                     | x when x > 0 -> return! wait ()
-                    | _ -> ()
-                }
-            wait ()
-
-        let waitForJobsToArrive (queue:Queue<_>) = 
-            let rec wait () =
-                async {
-                    do! Async.SwitchToNewThread ()
-                    let! count = queue.count()
-                    match count with
-                    | x when x = 0L -> return! wait ()
                     | _ -> ()
                 }
             wait ()
@@ -614,7 +603,7 @@ type QueueFixture () =
                 
                 // When
                 sendJobWithBull queuename 100 |> ignore
-                do! waitForJobsToArrive queue
+                do! queue.on.NewJob |> Async.AwaitEvent |> Async.Ignore
                 do! waitForQueueToFinish queue
 
                 //Then
@@ -646,7 +635,7 @@ type QueueFixture () =
 
                 // When
                 sendJobWithBull queuename 100 |> ignore
-                do! waitForJobsToArrive queue
+                do! queue.on.NewJob |> Async.AwaitEvent |> Async.Ignore
                 do! waitForQueueToFinish queue
 
                 //Then

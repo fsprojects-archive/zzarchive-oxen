@@ -339,6 +339,7 @@ and Events<'a> = {
     Failed: IEvent<OxenJobEvent<'a>>
     Paused: IEvent<OxenQueueEvent<'a>>
     Resumed: IEvent<OxenQueueEvent<'a>>
+    NewJob: IEvent<OxenNewJobEvent>
 }
 /// [omit]
 and LockRenewer<'a> (job:Job<'a>, token:Guid) =
@@ -664,6 +665,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         Completed = completedEvent.Publish
         Progress = progressEvent.Publish
         Failed = failedEvent.Publish
+        NewJob = onNewJob
     }
 
     //Internals
