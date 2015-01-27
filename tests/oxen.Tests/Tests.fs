@@ -708,7 +708,7 @@ type QueueFixture () =
             async {
                 let order = ref 0
                 let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
-                let queue = Queue<Order>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+                let queue = Queue<Order>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber, true)
                 queue.``process`` (fun j -> async {
                     !order |> should lessThan j.data.order
                     Debug.Print ("Order: " + j.data.order.ToString())
@@ -716,16 +716,16 @@ type QueueFixture () =
                     ()
                 })
 
-                do! queue.add({order = 1}, [("delay", "100")]) |> Async.Ignore
-                do! queue.add({order = 6}, [("delay", "1100")]) |> Async.Ignore
-                do! queue.add({order = 10}, [("delay", "1900")]) |> Async.Ignore
-                do! queue.add({order = 2}, [("delay", "300")]) |> Async.Ignore
-                do! queue.add({order = 9}, [("delay", "1700")]) |> Async.Ignore
-                do! queue.add({order = 5}, [("delay", "900")]) |> Async.Ignore
-                do! queue.add({order = 3}, [("delay", "500")]) |> Async.Ignore
-                do! queue.add({order = 7}, [("delay", "1300")]) |> Async.Ignore
-                do! queue.add({order = 4}, [("delay", "700")]) |> Async.Ignore
-                do! queue.add({order = 8}, [("delay", "1500")]) |> Async.Ignore
+                do queue.add({order = 1}, [("delay", "100")]) |> ignore
+                do queue.add({order = 6}, [("delay", "1100")]) |> ignore
+                do queue.add({order = 10}, [("delay", "1900")]) |> ignore
+                do queue.add({order = 2}, [("delay", "300")]) |> ignore
+                do queue.add({order = 9}, [("delay", "1700")]) |> ignore
+                do queue.add({order = 5}, [("delay", "900")]) |> ignore
+                do queue.add({order = 3}, [("delay", "500")]) |> ignore
+                do queue.add({order = 7}, [("delay", "1300")]) |> ignore
+                do queue.add({order = 4}, [("delay", "700")]) |> ignore
+                do queue.add({order = 8}, [("delay", "1500")]) |> ignore
                 do! waitForQueueToFinish queue
             } |> Async.RunSynchronously
 
