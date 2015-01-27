@@ -132,7 +132,7 @@ Target "Build" (fun _ ->
 
 Target "StartRedis" (fun _ ->
     async {
-        Shell.Exec("./packages/Redis-64.2.8.17/redis-server.exe") |> ignore
+        Shell.Exec("./packages/Redis-64.2.8.17/redis-server.exe", "--maxheap 200mb") |> ignore
     } |> Async.Start
 )
 
