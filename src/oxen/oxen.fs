@@ -34,9 +34,8 @@ module OxenConvenience =
     /// get RedisValue from RedisKey with a long in the middle
     let valueToKeyLong (x:RedisValue):RedisKey = RedisKey.op_Implicit(int64(x).ToString ())
     /// get RedisChannel from RedisKey
-    let keyToChannel (x:RedisKey):RedisChannel =
-        let key:string = RedisKey.op_Implicit(x)
-        RedisChannel.op_Implicit(key)
+    let keyToChannel (x:RedisKey):RedisChannel = 
+        RedisChannel.op_Implicit(RedisKey.op_Implicit(x):string)
 
     /// <summary>
     /// Option coalesing operator 
