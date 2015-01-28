@@ -48,15 +48,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '35', 35)" onmouseover="showTip(event, '35', 35)">
+          <code onmouseout="hideTip(event, '41', 41)" onmouseover="showTip(event, '41', 41)">
             new(name, mp)
           </code>
-          <div class="tip" id="35">
+          <div class="tip" id="41">
             <strong>Signature:</strong> (name:string * mp:ConnectionMultiplexer) -&gt; Queue&lt;&#39;a&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L403-403" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L507-507" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -67,15 +67,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '36', 36)" onmouseover="showTip(event, '36', 36)">
+          <code onmouseout="hideTip(event, '42', 42)" onmouseover="showTip(event, '42', 42)">
             new(...)
           </code>
-          <div class="tip" id="36">
+          <div class="tip" id="42">
             <strong>Signature:</strong> (name:string * dbFactory:(unit -&gt; IDatabase) * subscriberFactory:(unit -&gt; ISubscriber) * forceSequentialProcessing:bool option) -&gt; Queue&lt;&#39;a&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L294-294" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L379-379" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -93,15 +93,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '37', 37)" onmouseover="showTip(event, '37', 37)">
+          <code onmouseout="hideTip(event, '43', 43)" onmouseover="showTip(event, '43', 43)">
             add(data, opts)
           </code>
-          <div class="tip" id="37">
-            <strong>Signature:</strong> (data:&#39;a * opts:Map&lt;string,string&gt; option) -&gt; Async&lt;Job&lt;&#39;a&gt;&gt;<br />
+          <div class="tip" id="43">
+            <strong>Signature:</strong> (data:&#39;a * opts:(string * string) list option) -&gt; Async&lt;Job&lt;&#39;a&gt;&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L424-424" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L529-529" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -112,15 +112,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '38', 38)" onmouseover="showTip(event, '38', 38)">
+          <code onmouseout="hideTip(event, '44', 44)" onmouseover="showTip(event, '44', 44)">
             count()
           </code>
-          <div class="tip" id="38">
+          <div class="tip" id="44">
             <strong>Signature:</strong> unit -&gt; Async&lt;int64&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L479-479" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L588-588" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -131,15 +131,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '39', 39)" onmouseover="showTip(event, '39', 39)">
+          <code onmouseout="hideTip(event, '45', 45)" onmouseover="showTip(event, '45', 45)">
             empty()
           </code>
-          <div class="tip" id="39">
+          <div class="tip" id="45">
             <strong>Signature:</strong> unit -&gt; Async&lt;bool&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L490-490" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L599-599" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -150,15 +150,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '40', 40)" onmouseover="showTip(event, '40', 40)">
-            getActive()
+          <code onmouseout="hideTip(event, '46', 46)" onmouseover="showTip(event, '46', 46)">
+            getActive(start, stop)
           </code>
-          <div class="tip" id="40">
-            <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+          <div class="tip" id="46">
+            <strong>Signature:</strong> (start:int64 * stop:int64) -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L537-537" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L655-655" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -169,15 +169,34 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '41', 41)" onmouseover="showTip(event, '41', 41)">
-            getCompleted()
+          <code onmouseout="hideTip(event, '47', 47)" onmouseover="showTip(event, '47', 47)">
+            getActive()
           </code>
-          <div class="tip" id="41">
+          <div class="tip" id="47">
             <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L533-533" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L653-653" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get active jobs</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '48', 48)" onmouseover="showTip(event, '48', 48)">
+            getCompleted()
+          </code>
+          <div class="tip" id="48">
+            <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L649-649" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -188,15 +207,53 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '42', 42)" onmouseover="showTip(event, '42', 42)">
-            getFailed()
+          <code onmouseout="hideTip(event, '49', 49)" onmouseover="showTip(event, '49', 49)">
+            getDelayed(start, stop)
           </code>
-          <div class="tip" id="42">
+          <div class="tip" id="49">
+            <strong>Signature:</strong> (start:int64 * stop:int64) -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L659-659" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get delayed jobs</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '50', 50)" onmouseover="showTip(event, '50', 50)">
+            getDelayed()
+          </code>
+          <div class="tip" id="50">
             <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L531-531" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L657-657" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get delayed jobs</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '51', 51)" onmouseover="showTip(event, '51', 51)">
+            getFailed()
+          </code>
+          <div class="tip" id="51">
+            <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L647-647" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -207,15 +264,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '43', 43)" onmouseover="showTip(event, '43', 43)">
+          <code onmouseout="hideTip(event, '52', 52)" onmouseover="showTip(event, '52', 52)">
             getJob(id)
           </code>
-          <div class="tip" id="43">
+          <div class="tip" id="52">
             <strong>Signature:</strong> id:int64 -&gt; Async&lt;Job&lt;&#39;a&gt;&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L511-511" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L620-620" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -226,15 +283,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '44', 44)" onmouseover="showTip(event, '44', 44)">
-            getJobs(queueType, isList, start, stop)
+          <code onmouseout="hideTip(event, '53', 53)" onmouseover="showTip(event, '53', 53)">
+            getJobs(...)
           </code>
-          <div class="tip" id="44">
-            <strong>Signature:</strong> (queueType:string * isList:bool option * start:int64 option * stop:int64 option) -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
+          <div class="tip" id="53">
+            <strong>Signature:</strong> (queueType:string * listType:ListType * start:int64 option * stop:int64 option) -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L514-514" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L623-623" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -245,15 +302,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '45', 45)" onmouseover="showTip(event, '45', 45)">
+          <code onmouseout="hideTip(event, '54', 54)" onmouseover="showTip(event, '54', 54)">
             getWaiting()
           </code>
-          <div class="tip" id="45">
+          <div class="tip" id="54">
             <strong>Signature:</strong> unit -&gt; Async&lt;Job&lt;&#39;a&gt; []&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L535-535" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L651-651" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -264,15 +321,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '46', 46)" onmouseover="showTip(event, '46', 46)">
+          <code onmouseout="hideTip(event, '55', 55)" onmouseover="showTip(event, '55', 55)">
             moveJob(src, dest)
           </code>
-          <div class="tip" id="46">
+          <div class="tip" id="55">
             <strong>Signature:</strong> (src:RedisKey * dest:RedisKey) -&gt; Async&lt;RedisValue&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L507-507" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L616-616" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -283,15 +340,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '47', 47)" onmouseover="showTip(event, '47', 47)">
+          <code onmouseout="hideTip(event, '56', 56)" onmouseover="showTip(event, '56', 56)">
             name
           </code>
-          <div class="tip" id="47">
+          <div class="tip" id="56">
             <strong>Signature:</strong> string<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L407-407" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L511-511" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -302,15 +359,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '48', 48)" onmouseover="showTip(event, '48', 48)">
+          <code onmouseout="hideTip(event, '57', 57)" onmouseover="showTip(event, '57', 57)">
             on
           </code>
-          <div class="tip" id="48">
+          <div class="tip" id="57">
             <strong>Signature:</strong> Events&lt;&#39;a&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L540-540" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L662-662" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -320,15 +377,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '49', 49)" onmouseover="showTip(event, '49', 49)">
+          <code onmouseout="hideTip(event, '58', 58)" onmouseover="showTip(event, '58', 58)">
             pause()
           </code>
-          <div class="tip" id="49">
+          <div class="tip" id="58">
             <strong>Signature:</strong> unit -&gt; Async&lt;bool&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L452-452" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L561-561" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -341,15 +398,15 @@ note 2: (this turns a bit akward when the jobs run in parallel so it might just 
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '50', 50)" onmouseover="showTip(event, '50', 50)">
+          <code onmouseout="hideTip(event, '59', 59)" onmouseover="showTip(event, '59', 59)">
             process(handler)
           </code>
-          <div class="tip" id="50">
+          <div class="tip" id="59">
             <strong>Signature:</strong> (handler:(Job&lt;&#39;a&gt; -&gt; Async&lt;unit&gt;)) -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L410-410" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L515-515" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -361,15 +418,15 @@ Takes handler: <code>Job&lt;'a&gt; -&gt; Async&lt;unit&gt;</code> that will be c
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '51', 51)" onmouseover="showTip(event, '51', 51)">
+          <code onmouseout="hideTip(event, '60', 60)" onmouseover="showTip(event, '60', 60)">
             resume(handler)
           </code>
-          <div class="tip" id="51">
+          <div class="tip" id="60">
             <strong>Signature:</strong> (handler:(Job&lt;&#39;a&gt; -&gt; Async&lt;unit&gt;)) -&gt; Async&lt;unit&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L467-467" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L576-576" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -380,15 +437,34 @@ Takes handler: <code>Job&lt;'a&gt; -&gt; Async&lt;unit&gt;</code> that will be c
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '52', 52)" onmouseover="showTip(event, '52', 52)">
+          <code onmouseout="hideTip(event, '61', 61)" onmouseover="showTip(event, '61', 61)">
+            retryJob(job)
+          </code>
+          <div class="tip" id="61">
+            <strong>Signature:</strong> job:Job&lt;&#39;a&gt; -&gt; Async&lt;Job&lt;&#39;a&gt;&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L644-644" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>retry jobs</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '62', 62)" onmouseover="showTip(event, '62', 62)">
             run(handler)
           </code>
-          <div class="tip" id="52">
+          <div class="tip" id="62">
             <strong>Signature:</strong> (handler:(Job&lt;&#39;a&gt; -&gt; Async&lt;unit&gt;)) -&gt; Async&lt;unit&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L417-417" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L522-522" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>

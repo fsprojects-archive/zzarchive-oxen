@@ -59,7 +59,7 @@
                           <strong>Type parameters:</strong> 'a          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L38-38" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L39-39" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -73,18 +73,18 @@ Some 4 |? 3 -&gt; 4</code></p>
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '2', 2)" onmouseover="showTip(event, '2', 2)">
-            fromValueI32 x
+            epoch 
           </code>
           <div class="tip" id="2">
-            <strong>Signature:</strong> x:RedisValue -&gt; int<br />
+            <strong>Signature:</strong> DateTime<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L27-27" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L17-17" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>get int from RedisValue</p>
+          <p>epoch</p>
 
         </td>
       </tr>
@@ -92,18 +92,18 @@ Some 4 |? 3 -&gt; 4</code></p>
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '3', 3)" onmouseover="showTip(event, '3', 3)">
-            fromValueI64 x
+            fromUnixTime dt
           </code>
           <div class="tip" id="3">
-            <strong>Signature:</strong> x:RedisValue -&gt; int64<br />
+            <strong>Signature:</strong> dt:float -&gt; DateTime<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L25-25" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L49-49" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>get long from RedisValue</p>
+          <p>calc DateTime from millisecs since 1-1-1970</p>
 
         </td>
       </tr>
@@ -111,18 +111,18 @@ Some 4 |? 3 -&gt; 4</code></p>
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '4', 4)" onmouseover="showTip(event, '4', 4)">
-            fromValueStr x
+            getHashEntryByName hash name
           </code>
           <div class="tip" id="4">
-            <strong>Signature:</strong> x:RedisValue -&gt; string<br />
+            <strong>Signature:</strong> hash:HashEntry array -&gt; name:string -&gt; HashEntry option<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L23-23" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L42-42" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>get string from RedisValue</p>
+          <p>get the entry from the hash that correspons with the name</p>
 
         </td>
       </tr>
@@ -130,18 +130,18 @@ Some 4 |? 3 -&gt; 4</code></p>
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '5', 5)" onmouseover="showTip(event, '5', 5)">
-            getHashEntryByName hash name
+            keyToChannel x
           </code>
           <div class="tip" id="5">
-            <strong>Signature:</strong> hash:HashEntry array -&gt; name:string -&gt; HashEntry<br />
+            <strong>Signature:</strong> x:RedisKey -&gt; RedisChannel<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L41-41" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L29-29" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>get the entry from the hash that correspons with the name</p>
+          <p>get RedisChannel from RedisKey</p>
 
         </td>
       </tr>
@@ -156,7 +156,7 @@ Some 4 |? 3 -&gt; 4</code></p>
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L45-45" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L53-53" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -168,14 +168,52 @@ Some 4 |? 3 -&gt; 4</code></p>
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '7', 7)" onmouseover="showTip(event, '7', 7)">
-            toValueI32 x
+            toUnixTime dt
           </code>
           <div class="tip" id="7">
+            <strong>Signature:</strong> dt:DateTime -&gt; float<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L46-46" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>calc unix time from millisecs since 1-1-1970</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '8', 8)" onmouseover="showTip(event, '8', 8)">
+            toValueFloat x
+          </code>
+          <div class="tip" id="8">
+            <strong>Signature:</strong> x:float -&gt; RedisValue<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L25-25" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>make RedisValue from float</p>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '9', 9)" onmouseover="showTip(event, '9', 9)">
+            toValueI32 x
+          </code>
+          <div class="tip" id="9">
             <strong>Signature:</strong> x:int32 -&gt; RedisValue<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L21-21" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L23-23" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -186,15 +224,15 @@ Some 4 |? 3 -&gt; 4</code></p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '8', 8)" onmouseover="showTip(event, '8', 8)">
+          <code onmouseout="hideTip(event, '10', 10)" onmouseover="showTip(event, '10', 10)">
             toValueI64 x
           </code>
-          <div class="tip" id="8">
+          <div class="tip" id="10">
             <strong>Signature:</strong> x:int64 -&gt; RedisValue<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L19-19" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L21-21" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -205,15 +243,15 @@ Some 4 |? 3 -&gt; 4</code></p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '9', 9)" onmouseover="showTip(event, '9', 9)">
+          <code onmouseout="hideTip(event, '11', 11)" onmouseover="showTip(event, '11', 11)">
             toValueStr x
           </code>
-          <div class="tip" id="9">
+          <div class="tip" id="11">
             <strong>Signature:</strong> x:string -&gt; RedisValue<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L17-17" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L19-19" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -224,15 +262,15 @@ Some 4 |? 3 -&gt; 4</code></p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '10', 10)" onmouseover="showTip(event, '10', 10)">
+          <code onmouseout="hideTip(event, '12', 12)" onmouseover="showTip(event, '12', 12)">
             valueToKeyLong x
           </code>
-          <div class="tip" id="10">
+          <div class="tip" id="12">
             <strong>Signature:</strong> x:RedisValue -&gt; RedisKey<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L29-29" class="github-link">
+            <a href="http://github.com/curit/oxen/tree/master/src/oxen/oxen.fs#L27-27" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
