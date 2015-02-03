@@ -325,10 +325,13 @@ type QueueFixture () =
                 d.ListRangeAsync (any(),any(),any()) --> taskEmptyValues ()
                 d.SetContainsAsync (any(), any()) --> taskTrue () 
                 d.ListRightPopLeftPushAsync(any(), any(), any()) --> taskEmptyValue()
+                d.ScriptEvaluateAsync((any():string), any(), any(), any()) --> taskRedisResult()
             @>
         )
         let sub = Mock<ISubscriber>().Create()
         let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
+
+        printfn "hu?"
 
         let pauseHappend = ref false
         let resumeHappend = ref false
@@ -337,15 +340,13 @@ type QueueFixture () =
         queue.on.Paused.Add(fun q -> pauseHappend := true)
 
         // When    
-        let paused = queue.pause () |> Async.RunSynchronously
-        queue.resume (fun _ -> async {()}) |> Async.RunSynchronously 
+        queue.pause () |> Async.RunSynchronously
+        queue.resume () |> Async.RunSynchronously |> ignore
 
         // Then 
         !resumeHappend |> should be True
         !pauseHappend |> should be True
-        
-        paused |> should be True
-
+       
     type TestControlMessage = 
         {
             times: int

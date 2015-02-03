@@ -421,7 +421,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         settings
     )
 
-    let mutable paused = false
     let mutable processing = false
     let mutable delayedTimeStamp = Double.MaxValue
     let mutable delayedJobsCancellationTokenSource = new CancellationTokenSource ()
@@ -449,11 +448,13 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                         this.updateDelayTimer(v |> float)
                     } |> Async.RunSynchronously))
 
-    do sub.Subscribe(_toKey("paused") |> keyToChannel, (fun c v -> this.emitQueueEvent(Paused)))
-    do sub.Subscribe(_toKey("resumed") |> keyToChannel, (fun c v -> this.emitQueueEvent(Resumed)))
+    do sub.Subscribe(_toKey("paused") |> keyToChannel, 
+        (fun c v -> do this.emitQueueEvent(Paused) |> Async.RunSynchronously))
+    
+    do sub.Subscribe(_toKey("resumed") |> keyToChannel, 
+        (fun c v -> do this.emitQueueEvent(Resumed) |> Async.RunSynchronously))
 
     do logger.Info "subscribed to %A" newJobChannel
-
 
     let token = Guid.NewGuid ()
 
@@ -467,7 +468,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     let processJob handler job = 
         async { 
-            if paused then ()
             processing <- true
             use lr = new LockRenewer<'a>(job, token)
             try
@@ -506,8 +506,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 | true -> do! processJob handler job
                 | false -> do processJob handler job |> Async.Start
             
-                if not(paused) then 
-                    return! processJobs handler
+            return! processJobs handler
         }
 
     let processStalledJob handler (job:Job<'a>) = 
@@ -600,7 +599,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     member x.pause () = this.pauseResume true
       
     /// resume a paused queue  
-    member x.resume handler = this.pauseResume false
+    member x.resume () = 
+        this.pauseResume false
 
     member private x.pauseResume pause = 
         async {
@@ -613,7 +613,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             let publishTo = if pause then "paused" else "resumed"
 
             let script = "
-               if redis.call(\"EXISTS\", KEYS[1]) == 1 then
+                local lastId = redis.call(\"GET\", KEYS[6])
+                if redis.call(\"EXISTS\", KEYS[1]) == 1 then
                  redis.call(\"RENAME\", KEYS[1], KEYS[2])
                 end
                 if ARGV[1] == \"paused\" then
@@ -621,12 +622,13 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 else
                  redis.call(\"DEL\", KEYS[3])
                 end
-                redis.call(\"PUBLISH\", KEYS[4], ARGV[1])"
+                redis.call(\"PUBLISH\", KEYS[4], ARGV[1])
+                redis.call(\"PUBLISH\", KEYS[5], lastId)"
             
-            let keys = [| src; dest; "meta-paused"; "paused" |] |> Array.map this.toKey
+            let keys = [| src; dest; "meta-paused"; "paused"; "jobs" |] |> Array.map this.toKey
             let client = this.client ()
             let! result = client.ScriptEvaluateAsync(script, keys, [| publishTo |> toValueStr |]) |> Async.AwaitTask   
-            return result.IsNull |> not
+            ()
         }
 
     /// return the length of the queue
@@ -638,7 +640,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             let pausedLength = multi.ListLengthAsync (this.toKey("paused"))
             let delayedLength = multi.SortedSetLengthAsync (this.toKey("delayed"))
             do! multi.ExecuteAsync () |> Async.AwaitTask |> Async.Ignore
-            return [| waitLength.Result; pausedLength.Result; |] |> Seq.max + delayedLength.Result
+            let length = [| waitLength.Result; pausedLength.Result; |] |> Seq.max
+            return length + delayedLength.Result
         }
     
     /// empty the queue doesn't remove the jobs just removes the wait list so it won't do anything else.
@@ -718,6 +721,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     //Internals
     member internal x.toKey kind = _toKey kind
+
     member internal x.emitQueueEvent (eventType) = 
         async {
             logger.Info "emitting new queue-event %A for queue %s" eventType name

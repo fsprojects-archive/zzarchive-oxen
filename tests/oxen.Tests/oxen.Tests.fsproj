@@ -31,6 +31,11 @@
     </StartProgram>
     <StartArguments>
     </StartArguments>
+    <CustomCommands>
+      <CustomCommands>
+        <Command type="Execute" command="../../packages/xunit.runners/tools/xunit.console.clr4.exe ${TargetFile}" />
+      </CustomCommands>
+    </CustomCommands>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
