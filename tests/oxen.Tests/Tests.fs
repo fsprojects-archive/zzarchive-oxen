@@ -316,36 +316,6 @@ type QueueFixture () =
             verify <@ db.HashGetAllAsync(any()) @> once
              
         } |> Async.RunSynchronously
-
-    [<Fact>]
-    let ``should be able to pause and resume the queue`` () =
-        // Given
-        let db = Mock<IDatabase>.With(fun d ->
-            <@
-                d.ListRangeAsync (any(),any(),any()) --> taskEmptyValues ()
-                d.SetContainsAsync (any(), any()) --> taskTrue () 
-                d.ListRightPopLeftPushAsync(any(), any(), any()) --> taskEmptyValue()
-                d.ScriptEvaluateAsync((any():string), any(), any(), any()) --> taskRedisResult()
-            @>
-        )
-        let sub = Mock<ISubscriber>().Create()
-        let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
-
-        printfn "hu?"
-
-        let pauseHappend = ref false
-        let resumeHappend = ref false
-
-        queue.on.Resumed.Add(fun q -> resumeHappend := true)
-        queue.on.Paused.Add(fun q -> pauseHappend := true)
-
-        // When    
-        queue.pause () |> Async.RunSynchronously
-        queue.resume () |> Async.RunSynchronously |> ignore
-
-        // Then 
-        !resumeHappend |> should be True
-        !pauseHappend |> should be True
        
     type TestControlMessage = 
         {
@@ -724,7 +694,25 @@ type QueueFixture () =
                 do! waitForQueueToFinish queue
             } |> Async.RunSynchronously
 
+        [<Fact>]
+        let ``should be able to pause and resume the queue`` () =
+            // Given
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+            let queue = Queue<Data>("stuff", mp.GetDatabase, mp.GetSubscriber)
 
+            let pauseHappend = ref false
+            let resumeHappend = ref false
+
+            queue.on.Resumed.Add(fun q -> resumeHappend := true)
+            queue.on.Paused.Add(fun q -> pauseHappend := true)
+
+            // When    
+            queue.pause () |> Async.RunSynchronously
+            queue.resume () |> Async.RunSynchronously |> ignore
+
+            // Then 
+            !resumeHappend |> should be True
+            !pauseHappend |> should be True
 
         [<Fact>]
         let ``it should be possible to ensure delivery of a job to more than one listener`` () = ()
