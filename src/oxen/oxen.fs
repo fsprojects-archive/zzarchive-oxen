@@ -97,6 +97,8 @@ type Job<'a> =
         delay: float option
         /// timestamp
         timestamp: DateTime
+        /// stacktrace
+        stacktrace: string option
     }
     static member private logger = LogManager.getLogger()
     member private this._logger = Job<'a>.logger
@@ -252,7 +254,15 @@ type Job<'a> =
     member this.moveToCompleted () = this.moveToSet("completed")
 
     /// move this job to the failed list.
-    member this.moveToFailed () = this.moveToSet("failed")
+    member this.moveToFailed (e) = 
+        async {
+            let client = this.queue.client()
+            do! client.HashSetAsync(
+                    this.queue.toKey(this.jobId |> string), 
+                    [| HashEntry(toValueStr "stacktrace", e |> string |> toValueStr) |])
+                    |> Async.awaitPlainTask
+            return! this.moveToSet("failed")
+        }
 
     member this.moveToDelayed timestamp =
         this.moveToSet ("delayed", timestamp)
@@ -277,7 +287,17 @@ type Job<'a> =
                 | Some o when (o.ContainsKey "timestamp") -> o.["timestamp"] |> Double.Parse |> fromUnixTime
                 | _ -> DateTime.Now
 
-            let job = { queue = queue; data = data; jobId = jobId; opts = opts; _progress = 0; timestamp = timestamp; delay = delay }
+            let job = 
+                { 
+                    queue = queue
+                    data = data
+                    jobId = jobId
+                    opts = opts
+                    _progress = 0
+                    timestamp = timestamp
+                    delay = delay
+                    stacktrace = None 
+                }
             let client:IDatabase = queue.client()
             do! client.HashSetAsync (queue.toKey (jobId.ToString ()), job.toData ()) |> Async.awaitPlainTask
             return job 
@@ -289,6 +309,17 @@ type Job<'a> =
             let client = queue.client
             let! job = client().HashGetAllAsync (queue.toKey(jobId.ToString())) |> Async.AwaitTask
             let jobHash = job |> getHashEntryByName 
+            let stacktrace = 
+                match jobHash("stacktrace") with
+                | None -> None
+                | Some x -> x.Value |> string |> Some
+            let delay = 
+                match jobHash("delay") with
+                | None -> None
+                | Some x when x.Value |> string = "undefined" -> None
+                | Some x when x.Value |> float = 0. -> None
+                | Some x -> x.Value |> float |> Some
+               
             return Job.fromData (
                 queue, 
                 jobId,
@@ -296,21 +327,27 @@ type Job<'a> =
                 jobHash("opts").Value.Value |> string, 
                 jobHash("progress").Value.Value |> int,
                 jobHash("timestamp").Value.Value |> float,
-                match jobHash("delay") with
-                | None -> None
-                | Some x when x.Value |> string = "undefined" -> None
-                | Some x when x.Value |> float = 0. -> None
-                | Some x -> x.Value |> float |> Some)
+                stacktrace,
+                delay)
         }
 
     /// create a job from a redis hash
-    static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int, timestamp: float, delay: float option) =
+    static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int, timestamp: float, stacktrace: string option, delay: float option) =
         let sData = JsonConvert.DeserializeObject<'a>(data)
         let sOpts = 
             match JsonConvert.DeserializeObject<Dictionary<string, string>>(opts) with 
             | null -> None
             | _ as x -> x |> Seq.map (fun kv -> (kv.Key, kv.Value)) |> Map.ofSeq |> Some
-        { queue = queue; data = sData; jobId = jobId; opts = sOpts; _progress = progress; delay = delay; timestamp = timestamp |> fromUnixTime }
+        { 
+            queue = queue
+            data = sData
+            jobId = jobId
+            opts = sOpts
+            _progress = progress
+            delay = delay
+            timestamp = timestamp |> fromUnixTime 
+            stacktrace = stacktrace
+        }
 
 /// a job event 
 /// i.e.: Completed, Progress, Failed
@@ -391,7 +428,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     let _toKey kind = RedisKey.op_Implicit ("bull:" + name + ":" + kind)
 
-    
     let newJobChannel = _toKey("jobs") |> keyToChannel 
     let delayedJobChannel = _toKey("delayed") |> keyToChannel 
 
@@ -437,7 +473,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             with 
                 | _ as e -> 
                     logger.Error "handler failed for job %i with exn %A for queue %s" job.jobId e name
-                    do! job.moveToFailed () |> Async.Ignore
+                    do! job.moveToFailed (e) |> Async.Ignore
                     do! job.releaseLock token |> Async.Ignore
                     do! this.emitJobEvent(Failed, job, exn = e) 
         }

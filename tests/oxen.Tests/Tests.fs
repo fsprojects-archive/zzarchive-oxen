@@ -40,6 +40,7 @@ let taskJobHash () = Task.Factory.StartNew(fun () ->
         HashEntry(toValueStr "delay", toValueFloat 0.)
         HashEntry(toValueStr "timestamp", toValueFloat (DateTime.Now |> toUnixTime))
         HashEntry(toValueStr "progress", toValueI32 1)
+        HashEntry(toValueStr "stacktrace", toValueStr "errrrrrr")
     |])
 
 let taskValues (value:int64) = Task.Factory.StartNew(fun () -> [| RedisValue.op_Implicit(value) |])
@@ -56,7 +57,7 @@ type JobFixture () =
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
         // When
-        let job = Job.fromData(q, 1L, "{ \"value\": \"test\" }", "", 1, DateTime.Now |> toUnixTime, None)
+        let job = Job.fromData(q, 1L, "{ \"value\": \"test\" }", "", 1, DateTime.Now |> toUnixTime, None, None)
 
         // Then
         job.data.value |> should equal "test"
@@ -102,6 +103,7 @@ type JobFixture () =
             _progress = 0
             delay = None
             timestamp = DateTime.Now
+            stacktrace = None
         }
         
         // When
@@ -131,6 +133,7 @@ type JobFixture () =
             _progress = 0
             delay = None
             timestamp = DateTime.Now
+            stacktrace = None
         }
         
         // When
@@ -296,11 +299,12 @@ type QueueFixture () =
             let! job = queue.add({ value = "test" });
 
             //When
-            do! job.moveToFailed() |> Async.Ignore
+            do! job.moveToFailed(exn "test") |> Async.Ignore
             let! jobs = queue.getFailed() 
 
             //Then
             (jobs |> Seq.head).data.value |> should equal "test"
+            (jobs |> Seq.head).stacktrace |> should equal (Some "errrrrrr")
 
             let value = toValueI64 1L
             let key = queue.toKey("failed")
@@ -331,10 +335,12 @@ type QueueFixture () =
 
         queue.on.Resumed.Add(fun q -> resumeHappend := true)
         queue.on.Paused.Add(fun q -> pauseHappend := true)
-            
+
+        // When    
         let paused = queue.pause () |> Async.RunSynchronously
         queue.resume (fun _ -> async {()}) |> Async.RunSynchronously 
 
+        // Then 
         !resumeHappend |> should be True
         !pauseHappend |> should be True
         
@@ -571,7 +577,7 @@ type QueueFixture () =
                 do! job2.moveToCompleted() |> Async.Ignore
                 do! job2.remove()
                 mp.GetDatabase().ListRightPopLeftPush(queue.toKey("wait"), queue.toKey("active")) |> ignore
-                do! job3.moveToFailed() |> Async.Ignore
+                do! job3.moveToFailed(exn "errrrr") |> Async.Ignore
                 do! job3.remove()
                 do! queue.moveJob(queue.toKey("wait"), queue.toKey("active")) |> Async.Ignore
                 do! job4.remove()
