@@ -430,6 +430,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     let newJobChannel = _toKey("jobs") |> keyToChannel 
     let delayedJobChannel = _toKey("delayed") |> keyToChannel 
+    let resumedChannel = _toKey("resumed") |> keyToChannel 
+    let pausedChannel = _toKey("paused") |> keyToChannel 
 
     let sub = subscriberFactory ()
     do sub.Subscribe(
@@ -446,6 +448,9 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                     async {
                         this.updateDelayTimer(v |> float)
                     } |> Async.RunSynchronously))
+
+    do sub.Subscribe(_toKey("paused") |> keyToChannel, (fun c v -> this.emitQueueEvent(Paused)))
+    do sub.Subscribe(_toKey("resumed") |> keyToChannel, (fun c v -> this.emitQueueEvent(Resumed)))
 
     do logger.Info "subscribed to %A" newJobChannel
 
@@ -592,32 +597,36 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         }
 
     /// pause the queue
-    /// note: (waits for the last job to finish before pausing the queue.)
-    /// note 2: (this turns a bit akward when the jobs run in parallel so it might just do two more jobs before it pauses, but it will pause I promise)
-    member x.pause () = 
-        async {
-            logger.Info "pausing queue %s" name
-            if paused then 
-                return paused
-            else 
-                if processing then 
-                    do! this.on.Completed |> Async.AwaitEvent |> Async.Ignore
-                
-                paused <- true
-                do! this.emitQueueEvent Paused 
-                return paused
-        }
+    member x.pause () = this.pauseResume true
       
     /// resume a paused queue  
-    member x.resume handler = 
-        async { 
-            logger.Info "resuming queue %s" name
-            if paused then
-                paused <- false
-                do! this.emitQueueEvent Resumed
-                this.run handler |> Async.Start
-            else
-                failwith "Cannot resume running queue"
+    member x.resume handler = this.pauseResume false
+
+    member private x.pauseResume pause = 
+        async {
+            let src, dest = 
+                if pause then 
+                    ("paused", "wait")
+                else
+                    ("wait", "paused")
+
+            let publishTo = if pause then "paused" else "resumed"
+
+            let script = "
+               if redis.call(\"EXISTS\", KEYS[1]) == 1 then
+                 redis.call(\"RENAME\", KEYS[1], KEYS[2])
+                end
+                if ARGV[1] == \"paused\" then
+                 redis.call(\"SET\", KEYS[3], 1)
+                else
+                 redis.call(\"DEL\", KEYS[3])
+                end
+                redis.call(\"PUBLISH\", KEYS[4], ARGV[1])"
+            
+            let keys = [| src; dest; "meta-paused"; "paused" |] |> Array.map this.toKey
+            let client = this.client ()
+            let! result = client.ScriptEvaluateAsync(script, keys, [| publishTo |> toValueStr |]) |> Async.AwaitTask   
+            return result.IsNull |> not
         }
 
     /// return the length of the queue
@@ -627,8 +636,9 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             let multi = (this.client ()).CreateTransaction()
             let waitLength = multi.ListLengthAsync (this.toKey("wait"))
             let pausedLength = multi.ListLengthAsync (this.toKey("paused"))
+            let delayedLength = multi.SortedSetLengthAsync (this.toKey("delayed"))
             do! multi.ExecuteAsync () |> Async.AwaitTask |> Async.Ignore
-            return [| waitLength.Result; pausedLength.Result; |] |> Seq.max
+            return [| waitLength.Result; pausedLength.Result; |] |> Seq.max + delayedLength.Result
         }
     
     /// empty the queue doesn't remove the jobs just removes the wait list so it won't do anything else.
@@ -640,6 +650,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             let paused = multi.ListRangeAsync (this.toKey("paused"), 0L, -1L) 
             do multi.KeyDeleteAsync(this.toKey("wait")) |> ignore
             do multi.KeyDeleteAsync(this.toKey("paused")) |> ignore
+            do multi.KeyDeleteAsync(this.toKey("meta-paused")) |> ignore
+            do multi.KeyDeleteAsync(this.toKey("delayed")) |> ignore
             do multi.ExecuteAsync() |> ignore
             
             let jobKeys = Array.concat [|waiting.Result; paused.Result|]
