@@ -216,8 +216,10 @@ type Job<'a> =
                     else multi.ListLeftPushAsync (key, toValueI64 this.jobId)
 
             let result =  multi.PublishAsync (this.queue.toKey("jobs") |> keyToChannel, toValueI64 this.jobId)
+           
+            let! executed = multi.ExecuteAsync() |> Async.AwaitTask
 
-            do! multi.ExecuteAsync() |> Async.AwaitTask |> Async.Ignore
+            if not executed then failwith "an error occurred while executing a redis transaction"
 
             if result.Result < 1L then failwith "must have atleast one subscriber, me"
 
@@ -591,7 +593,9 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
             let result =  multi.PublishAsync (newJobChannel, toValueI64 jobId)
 
-            do! multi.ExecuteAsync() |> Async.AwaitTask |> Async.Ignore
+            let! executed = multi.ExecuteAsync() |> Async.AwaitTask
+
+            if not executed then failwith "an error occurred while executing a redis transaction"
 
             if result.Result < 1L then failwith "must have atleast one subscriber, me"
 

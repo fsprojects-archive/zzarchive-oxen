@@ -708,7 +708,9 @@ type QueueFixture () =
 
             // When
             queue.pause () |> Async.RunSynchronously
-            queue.resume () |> Async.RunSynchronously |> ignore
+            queue.resume () |> Async.RunSynchronously
+
+            Async.Sleep 200 |> Async.RunSynchronously
 
             // Then
             !resumeHappend |> should be True
