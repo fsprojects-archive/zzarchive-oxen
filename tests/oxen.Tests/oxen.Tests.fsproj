@@ -25,7 +25,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\fsharp_project_scaffold_tests.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\oxen.Tests.XML</DocumentationFile>
     <StartAction>Project</StartAction>
     <StartProgram>
     </StartProgram>
@@ -33,7 +33,7 @@
     </StartArguments>
     <CustomCommands>
       <CustomCommands>
-        <Command type="Execute" command="../../packages/xunit.runners/tools/xunit.console.clr4.exe ${TargetFile}" />
+        <Command type="Execute" command="../../packages/xunit.runner.console/tools/xunit.console.x86.exe ${TargetFile}" />
       </CustomCommands>
     </CustomCommands>
   </PropertyGroup>

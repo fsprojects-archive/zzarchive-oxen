@@ -44,14 +44,14 @@ let authors = [ "Curit"; "albertjan"; "remkoboschker" ]
 // Tags for your project (for NuGet package)
 let tags = "redis queue fsharp oxen"
 
-// File system information 
+// File system information
 let solutionFile  = "oxen.sln"
 
 // Pattern specifying assemblies to be tested using NUnit
 let testAssemblies = "tests/**/bin/Release/*Tests*.dll"
 
 // Git configuration (used for publishing documentation in gh-pages branch)
-// The profile where the project is posted 
+// The profile where the project is posted
 let gitHome = "https://github.com/curit"
 
 // The name of the project on GitHub
@@ -113,15 +113,15 @@ Target "CleanDocs" (fun _ ->
 )
 
 Target "BuildStackExchangeRedis" (fun _ ->
-    "StackExchange.Redis/StackExchange.Redis/bin/mono/StackExchange.Redis.dll" 
-        |> CopyFile ("packages/StackExchange.Redis.1.0.394/lib/net45/") 
+    "StackExchange.Redis/StackExchange.Redis/bin/mono/StackExchange.Redis.dll"
+        |> CopyFile ("packages/StackExchange.Redis.1.0.394/lib/net45/")
 )
 
 // --------------------------------------------------------------------------------------
 // Build library & test project
 
 Target "Build" (fun _ ->
-    
+
     !! solutionFile
     |> MSBuildRelease "" "Rebuild"
     |> ignore
@@ -136,9 +136,9 @@ Target "StartRedis" (fun _ ->
     } |> Async.Start
 )
 
-Target "RunNpmInstall" (fun _ -> 
-    match tryFindFileOnPath ("npm") with 
-    | Some x ->  
+Target "RunNpmInstall" (fun _ ->
+    match tryFindFileOnPath ("npm") with
+    | Some x ->
         #if MONO
         let y = x
         #else
@@ -150,17 +150,17 @@ Target "RunNpmInstall" (fun _ ->
 )
 
 Target "StartTestControlQueue" (fun _ ->
-    let node = 
-        #if MONO 
+    let node =
+        #if MONO
         "node"
         #else
         "node.exe"
         #endif
     do match tryFindFileOnPath (node) with
-        | Some x -> 
+        | Some x ->
             trace ("node found here: " + x)
-            Shell.AsyncExec(x, "test.js", "tests/oxen.Tests/") |> Async.Ignore |> Async.Start 
-        | None -> 
+            Shell.AsyncExec(x, "test.js", "tests/oxen.Tests/") |> Async.Ignore |> Async.Start
+        | None ->
             trace ("node not-found")
             ()
 )
@@ -169,7 +169,7 @@ Target "RunTests" (fun _ ->
     !! testAssemblies
     |> xUnit (fun p ->
         { p with
-            ToolPath = "./packages/xunit.runners/tools/xunit.console.clr4.exe"
+            ToolPath = "./packages/xunit.runner.console/tools/xunit.console.exe"
             TimeOut = TimeSpan.FromMinutes 20.
             OutputDir = "./" })
 )
@@ -212,7 +212,7 @@ Target "NuGet" (fun _ ->
             OutputPath = "bin"
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey"
-            Dependencies = 
+            Dependencies =
                 [
                     "StackExchange.Redis", GetPackageVersion "./packages/" "StackExchange.Redis"
                     "log4net",  GetPackageVersion "./packages/" "log4net"
@@ -274,7 +274,7 @@ Target "All" DoNothing
   ==> "BuildStackExchangeRedis"
   #endif
   ==> "Build"
-  #if MONO 
+  #if MONO
   #else
   ==> "StartRedis"
   #endif
@@ -286,7 +286,7 @@ Target "All" DoNothing
   ==> "All"
   =?> ("ReleaseDocs",isLocalBuild && not isMono)
 
-"All" 
+"All"
 #if MONO
 #else
   =?> ("SourceLink", Pdbstr.tryFind().IsSome )
@@ -299,7 +299,7 @@ Target "All" DoNothing
   ==> "GenerateHelp"
   ==> "GenerateReferenceDocs"
   ==> "GenerateDocs"
-    
+
 "ReleaseDocs"
   ==> "Release"
 
