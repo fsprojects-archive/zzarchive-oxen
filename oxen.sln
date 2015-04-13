@@ -42,7 +42,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "oxen.Tests", "tests\oxen.Te
 EndProject
 Global
 	GlobalSection(CodealikeProperties) = postSolution
-		SolutionGuid = 5eb780c5-2c2a-4f79-8aab-5a80ab372caf
+		SolutionGuid = 12990285-9b59-4639-88d1-140c9c6ba68b
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

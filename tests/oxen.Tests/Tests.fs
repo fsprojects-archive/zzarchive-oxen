@@ -32,7 +32,7 @@ let taskTrue () = Task.Factory.StartNew(fun () -> true)
 let taskFalse () = Task.Factory.StartNew(fun () -> false)
 let taskRedisResult () = Task.Factory.StartNew(fun () -> Mock<RedisResult>().Create());
 /// change default hash set order to check independence of field order
-let taskJobHash () = Task.Factory.StartNew(fun () -> 
+let taskJobHash () = Task.Factory.StartNew(fun () ->
     [|
         HashEntry(toValueStr "opts", toValueStr "")
         HashEntry(toValueStr "data", toValueStr "{ \"value\": \"test\" }")
@@ -47,7 +47,7 @@ let taskValues (value:int64) = Task.Factory.StartNew(fun () -> [| RedisValue.op_
 let taskEmptyValues () = Task.Factory.StartNew(fun () -> [| |])
 let taskEmptyValue () = Task.Factory.StartNew(fun () -> new RedisValue())
 
-type JobFixture () = 
+type JobFixture () =
     [<Fact>]
     let ``should create a new job from given json data`` () =
         // Given
@@ -75,10 +75,10 @@ type JobFixture () =
         let sub = Mock<ISubscriber>().Create();
 
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
-        
-        // When 
+
+        // When
         let job = Job.fromId(q, 1L) |> Async.RunSynchronously
-        
+
         // Then
         job.data.value |> should equal "test"
         job.jobId |> should equal 1L
@@ -105,7 +105,7 @@ type JobFixture () =
             timestamp = DateTime.Now
             stacktrace = None
         }
-        
+
         // When
         let taken = job.takeLock (Guid.NewGuid ()) |> Async.RunSynchronously
 
@@ -113,7 +113,7 @@ type JobFixture () =
         taken |> should be True
         verify <@ db.StringSetAsync (any(), any(), any(), When.NotExists) @> once
 
-    
+
     [<Fact>]
     let ``should be able to renew a lock on a job`` () =
         // Given
@@ -135,7 +135,7 @@ type JobFixture () =
             timestamp = DateTime.Now
             stacktrace = None
         }
-        
+
         // When
         let taken = job.takeLock (Guid.NewGuid (), true) |> Async.RunSynchronously
 
@@ -144,7 +144,7 @@ type JobFixture () =
         verify <@ db.StringSetAsync (any(), any(), any(), When.Always) @> once
 
     [<Fact>]
-    let ``should be able to move job to completed`` () = 
+    let ``should be able to move job to completed`` () =
         async {
             // Given
             let trans = Mock<ITransaction>.With(fun t ->
@@ -155,8 +155,8 @@ type JobFixture () =
                 @>
             )
 
-            let db = Mock<IDatabase>.With(fun d -> 
-                <@ 
+            let db = Mock<IDatabase>.With(fun d ->
+                <@
                     d.HashSetAsync(any(), any()) --> taskUnit()
                     d.StringIncrementAsync(any()) --> taskIncr()
                     d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
@@ -167,9 +167,9 @@ type JobFixture () =
 
             let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
             let! job = Job<Data>.create(q, 1L, { value = "test" }, None)
-            
+
             // When
-            let! result = job.moveToCompleted() 
+            let! result = job.moveToCompleted()
 
             // Then
             result |> should be True
@@ -183,7 +183,7 @@ type JobFixture () =
 type QueueFixture () =
     [<Fact>]
     let ``should be able to add a job to the queue`` () =
-  
+
         // Given
         let trans = Mock<ITransaction>.With(fun t ->
             <@
@@ -192,8 +192,8 @@ type QueueFixture () =
                 t.ExecuteAsync () --> taskTrue()
             @>
         )
-        let db = Mock<IDatabase>.With(fun d -> 
-            <@ 
+        let db = Mock<IDatabase>.With(fun d ->
+            <@
                 d.HashSetAsync(any(), any()) --> taskUnit()
                 d.StringIncrementAsync(any()) --> taskIncr()
                 d.CreateTransaction(any()) --> trans
@@ -201,10 +201,10 @@ type QueueFixture () =
         )
         let sub = Mock<ISubscriber>().Create()
         let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
-        
+
         // When
         let job = queue.add ({value = "test"}) |> Async.RunSynchronously
-    
+
         // Then
         job.data.value |> should equal "test"
         job.jobId |> should equal 1L
@@ -214,13 +214,13 @@ type QueueFixture () =
         verify <@ trans.PublishAsync(any(), any(), any()) @> once
 
     [<Fact>]
-    let ``toKey should return a key that works with bull`` () = 
+    let ``toKey should return a key that works with bull`` () =
         // Given
         let db = Mock<IDatabase>().Create();
         let sub = Mock<ISubscriber>().Create();
 
         let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
-        
+
         // When
         let result = queue.toKey("stuff")
 
@@ -237,40 +237,40 @@ type QueueFixture () =
                     t.ExecuteAsync () --> taskTrue()
                 @>
             )
-            // Given 
-            let db = Mock<IDatabase>.With(fun d -> 
-                <@ 
+            // Given
+            let db = Mock<IDatabase>.With(fun d ->
+                <@
                     d.HashSetAsync(any(), any()) --> taskUnit()
                     d.StringIncrementAsync(any()) --> taskIncr()
                     d.CreateTransaction(any()) --> trans
                 @>
             )
-            
+
             let sub = Mock<ISubscriber>().Create()
 
             let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
-            
+
             let! job = queue.add({ value = "test" })
             let eventFired = ref false
             queue.on.Progress.Add(
-                fun e -> 
+                fun e ->
                     eventFired := true
-                    match e.progress with 
+                    match e.progress with
                     | Some x -> x |> should equal 100
                     | None -> failwith "progress should not be null"
             )
 
             // When
             do! job.progress 100
-        
-            // Then 
+
+            // Then
             !eventFired |> should be True
             verify <@ trans.ListLeftPushAsync(any(), any(), any(), any()) @> once
             verify <@ trans.PublishAsync(any(), any(), any()) @> once
-        } |> Async.RunSynchronously    
-        
+        } |> Async.RunSynchronously
+
     [<Fact>]
-    let ``should be able to get failed jobs`` () = 
+    let ``should be able to get failed jobs`` () =
         async {
             // Given
             let trans = Mock<ITransaction>.With(fun t ->
@@ -283,8 +283,8 @@ type QueueFixture () =
                 @>
             )
 
-            let db = Mock<IDatabase>.With(fun d -> 
-                <@ 
+            let db = Mock<IDatabase>.With(fun d ->
+                <@
                     d.HashSetAsync(any(), any()) --> taskUnit()
                     d.StringIncrementAsync(any()) --> taskIncr()
                     d.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
@@ -300,7 +300,7 @@ type QueueFixture () =
 
             //When
             do! job.moveToFailed(exn "test") |> Async.Ignore
-            let! jobs = queue.getFailed() 
+            let! jobs = queue.getFailed()
 
             //Then
             (jobs |> Seq.head).data.value |> should equal "test"
@@ -314,55 +314,26 @@ type QueueFixture () =
             verify <@ trans.SetAddAsync(any(), value, any()) @> once
             verify <@ db.SetMembersAsync(key) @> once
             verify <@ db.HashGetAllAsync(any()) @> once
-             
+
         } |> Async.RunSynchronously
 
-    [<Fact>]
-    let ``should be able to pause and resume the queue`` () =
-        // Given
-        let db = Mock<IDatabase>.With(fun d ->
-            <@
-                d.ListRangeAsync (any(),any(),any()) --> taskEmptyValues ()
-                d.SetContainsAsync (any(), any()) --> taskTrue () 
-                d.ListRightPopLeftPushAsync(any(), any(), any()) --> taskEmptyValue()
-            @>
-        )
-        let sub = Mock<ISubscriber>().Create()
-        let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
-
-        let pauseHappend = ref false
-        let resumeHappend = ref false
-
-        queue.on.Resumed.Add(fun q -> resumeHappend := true)
-        queue.on.Paused.Add(fun q -> pauseHappend := true)
-
-        // When    
-        let paused = queue.pause () |> Async.RunSynchronously
-        queue.resume (fun _ -> async {()}) |> Async.RunSynchronously 
-
-        // Then 
-        !resumeHappend |> should be True
-        !pauseHappend |> should be True
-        
-        paused |> should be True
-
-    type TestControlMessage = 
+    type TestControlMessage =
         {
             times: int
-            queueName: string    
+            queueName: string
         }
 
-    type IntegrationTests () = 
+    type IntegrationTests () =
         let logger = LogManager.getNamedLogger "IntegrationTests"
         let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
         let q = Queue<TestControlMessage>("test-control-messages", mp.GetDatabase, mp.GetSubscriber)
-        let sendJobWithBull queue times = 
+        let sendJobWithBull queue times =
             q.add({ times = times; queueName = queue }) |> Async.RunSynchronously
-            
 
-        let waitForQueueToFinish (queue:Queue<_>) = 
+
+        let waitForQueueToFinish (queue:Queue<_>) =
             let db = mp.GetDatabase ()
-            let rec wait () = 
+            let rec wait () =
                 async {
                     let! waiting = queue.getWaiting()
                     let! active = queue.getActive()
@@ -373,13 +344,13 @@ type QueueFixture () =
             wait ()
 
         [<Fact>]
-        let ``should call handler when a new job is added`` () = 
+        let ``should call handler when a new job is added`` () =
             // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
             let newJob = ref false
             do queue.``process`` (fun j -> async { newJob := true })
-            
+
             async {
                 // When
                 do queue.add({value = "test"}) |> Async.Ignore |> Async.Start
@@ -394,13 +365,13 @@ type QueueFixture () =
             } |> Async.RunSynchronously
 
         [<Fact>]
-        let ``should serialize json camelCase`` () = 
+        let ``should serialize json camelCase`` () =
             // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
             let queue = Queue<OtherData>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
             let newJob = ref false
             do queue.``process`` (fun j -> async { newJob := true })
-            
+
             async {
                 // When
                 do queue.add({Value = "test"}) |> Async.Ignore |> Async.Start
@@ -419,18 +390,18 @@ type QueueFixture () =
 
 
         [<Fact>]
-        let ``should process stalled jobs when queue starts`` () = 
+        let ``should process stalled jobs when queue starts`` () =
             // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
-            
+
             async {
                 // When
                 let! job = queue.add({value = "test"});
                 do! queue.moveJob(queue.toKey("wait"), queue.toKey("active")) |> Async.Ignore
                 let stalledJob = ref false
                 queue.``process``(fun j -> async {
-                    stalledJob := true    
+                    stalledJob := true
                 })
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
 
@@ -474,7 +445,7 @@ type QueueFixture () =
                 let token = Guid.NewGuid ()
                 let! lockTaken = job.takeLock (token)
                 let! lockReleased = job.releaseLock (token)
-                
+
                 // Then
                 lockTaken |> should be True
                 lockReleased |> should equal 1L
@@ -498,10 +469,10 @@ type QueueFixture () =
                 do! queue.add({ value = "bert7" }) |> Async.Ignore
 
                 // Then
-                let! count = queue.count () 
+                let! count = queue.count ()
                 count |> should equal 7L
                 do! queue.empty () |> Async.Ignore
-                let! empty = queue.count () 
+                let! empty = queue.count ()
                 empty |> should equal 0L
             } |> Async.RunSynchronously
 
@@ -511,7 +482,7 @@ type QueueFixture () =
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
 
-            let lifo = [("lifo", "true")] 
+            let lifo = [("lifo", "true")]
 
             async {
                 // When
@@ -524,7 +495,7 @@ type QueueFixture () =
                 do! queue.add({ value = "bert7" }, lifo) |> Async.Ignore
 
                 // Then
-                let! count = queue.count () 
+                let! count = queue.count ()
                 count |> should equal 7L
                 let! waiting = queue.getWaiting()
                 waiting.[0].jobId |> should equal 1L
@@ -537,24 +508,24 @@ type QueueFixture () =
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
 
-            queue.``process``(fun j -> 
+            queue.``process``(fun j ->
                 async {
                     if j.jobId % 2L = 0L then failwith "aaaargg it be even!"
                 })
 
             async {
                 // When
-                let! job1 = queue.add({ value = "bert1" }) 
-                let! job2 = queue.add({ value = "bert2" }) 
+                let! job1 = queue.add({ value = "bert1" })
+                let! job2 = queue.add({ value = "bert2" })
 
                 do! waitForQueueToFinish queue
 
                 // Then
-                let! j1c = job1.isCompleted 
+                let! j1c = job1.isCompleted
                 j1c |> should be True
-                let! j2c = job2.isCompleted 
+                let! j2c = job2.isCompleted
                 j2c |> should be False
-                let! j2f = job2.isFailed 
+                let! j2f = job2.isFailed
                 j2f |> should be True
             } |> Async.RunSynchronously
 
@@ -570,7 +541,7 @@ type QueueFixture () =
                 let! job3 = queue.add({ value = "test"})
                 let! job4 = queue.add({ value = "test"})
                 let! job5 = queue.add({ value = "test"})
-                
+
                 // When
                 do! job1.remove()
                 mp.GetDatabase().ListRightPopLeftPush(queue.toKey("wait"), queue.toKey("active")) |> ignore
@@ -595,18 +566,18 @@ type QueueFixture () =
             } |> Async.RunSynchronously
 
         [<Fact>]
-        let ``should be able to send a job from bull to oxen`` () = 
+        let ``should be able to send a job from bull to oxen`` () =
             async {
                 // Given
                 let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queuename = (Guid.NewGuid ()).ToString()
                 let queue = new Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
-                queue.``process`` (fun j -> 
+                queue.``process`` (fun j ->
                     async {
                         Debug.Print (j.jobId.ToString ())
                         Debug.Print "huuu"
                     })
-                
+
                 // When
                 sendJobWithBull queuename 100 |> ignore
                 do! queue.on.NewJob |> Async.AwaitEvent |> Async.Ignore
@@ -620,20 +591,20 @@ type QueueFixture () =
             } |> Async.RunSynchronously
 
         [<Fact>]
-        let ``should be able to send a job from bull to oxen with two listening queue's`` () = 
+        let ``should be able to send a job from bull to oxen with two listening queue's`` () =
             async {
                 // Given
                 let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queuename = (Guid.NewGuid ()).ToString()
                 let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
-                queue.``process`` (fun j -> 
+                queue.``process`` (fun j ->
                     async {
                         Debug.Print (j.jobId.ToString ())
                         Debug.Print "huuu"
                     })
-                
+
                 let queue2 = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
-                queue2.``process`` (fun j -> 
+                queue2.``process`` (fun j ->
                     async {
                         Debug.Print (j.jobId.ToString ())
                         Debug.Print "huuu2"
@@ -658,20 +629,20 @@ type QueueFixture () =
                 let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp)
                 let called = ref 0
-                queue.on.Failed.Add (fun j -> 
+                queue.on.Failed.Add (fun j ->
                     j.job.retry() |> Async.RunSynchronously |> ignore
                 )
                 queue.``process`` (fun j ->
                     async {
                         Debug.Print ("processing job " + j.jobId.ToString ())
                         called := !called + 1
-                        if !called % 2 = 1 then 
+                        if !called % 2 = 1 then
                             failwith "Noooo!..... it be uneven!"
                     })
 
                 let! job = queue.add({value = "test"});
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
-                let! completed = job.isCompleted 
+                let! completed = job.isCompleted
                 completed |> should be True
                 !called |> should equal 2
             }|> Async.RunSynchronously
@@ -690,9 +661,9 @@ type QueueFixture () =
                 })
                 let! job = queue.add({ value = "test"}, [("delay", delay |> string)])
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
-                let! delayed = queue.getDelayed () 
+                let! delayed = queue.getDelayed ()
                 delayed.Length |> should equal 0
-                let! completed = queue.getCompleted () 
+                let! completed = queue.getCompleted ()
                 completed.Length |> should equal 1
                 !called |> should be True
             } |> Async.RunSynchronously
@@ -723,7 +694,27 @@ type QueueFixture () =
                 do! waitForQueueToFinish queue
             } |> Async.RunSynchronously
 
+        [<Fact>]
+        let ``should be able to pause and resume the queue`` () =
+            // Given
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+            let queue = Queue<Data>("stuff", mp.GetDatabase, mp.GetSubscriber)
 
+            let pauseHappend = ref false
+            let resumeHappend = ref false
+
+            queue.on.Resumed.Add(fun q -> resumeHappend := true)
+            queue.on.Paused.Add(fun q -> pauseHappend := true)
+
+            // When
+            queue.pause () |> Async.RunSynchronously
+            queue.resume () |> Async.RunSynchronously
+
+            Async.Sleep 200 |> Async.RunSynchronously
+
+            // Then
+            !resumeHappend |> should be True
+            !pauseHappend |> should be True
 
         [<Fact>]
         let ``it should be possible to ensure delivery of a job to more than one listener`` () = ()
@@ -751,5 +742,5 @@ type QueueFixture () =
 
         // could call listeners subscribers, a group of listeners a subscription and a group of subscriptions about the same thing a topic
         // how does this translate to jobs?
-        // a job is put on a queue for a worker, there can be a pool of workers listening for jobs, 
+        // a job is put on a queue for a worker, there can be a pool of workers listening for jobs,
         // bull:topic:queue:id or bull:queue:id
