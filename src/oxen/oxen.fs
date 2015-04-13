@@ -629,7 +629,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 else
                  redis.call(\"DEL\", KEYS[3])
                 end
-                redis.log(redis.LOG_WARNING, \"Channel: \" .. KEYS[4] .. \" Message: \" .. ARGV[1])
                 redis.call(\"PUBLISH\", KEYS[4], ARGV[1])
                 redis.call(\"PUBLISH\", KEYS[5], lastId)"
 
