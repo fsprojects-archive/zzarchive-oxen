@@ -1,4 +1,4 @@
-[![Build status](https://ci.appveyor.com/api/projects/status/1c4kox8j9ludex49?svg=true)](https://ci.appveyor.com/project/albertjan/oxen)
+[![Build status](https://ci.appveyor.com/api/projects/status/m9ho080voc0yif7o/branch/master?svg=true)](https://ci.appveyor.com/project/albertjan/oxen-mcer1/branch/master)
 [![Build Status](https://travis-ci.org/fsprojects/oxen.svg?branch=master)](https://travis-ci.org/curit/oxen)
 
 # Oxen
