@@ -114,7 +114,7 @@ Target "CleanDocs" (fun _ ->
 
 Target "BuildStackExchangeRedis" (fun _ ->
     "StackExchange.Redis/StackExchange.Redis/bin/mono/StackExchange.Redis.dll"
-        |> CopyFile ("packages/StackExchange.Redis.1.0.414/lib/net45/")
+        |> CopyFile ("packages/StackExchange.Redis.1.0.371/lib/net45/")
 )
 
 // --------------------------------------------------------------------------------------
