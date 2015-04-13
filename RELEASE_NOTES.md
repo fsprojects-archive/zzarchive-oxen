@@ -18,7 +18,11 @@
 #### 0.0.5 - released
 * add constructor to Queue<'a> for convenience
 
-#### 0.2.0 - release
+#### 0.2.0 - released
 * add delayed jobs 
 * add simple retry
 * sync version with bull
+
+#### 0.2.1 - released
+* add stacktrace to errored jobs
+* add better implementation of pause/resume
