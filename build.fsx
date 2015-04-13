@@ -100,9 +100,7 @@ Target "AssemblyInfo" (fun _ ->
 )
 
 // --------------------------------------------------------------------------------------
-// Clean build results & restore NuGet packages
-
-Target "RestorePackages" RestorePackages
+// Clean build results
 
 Target "Clean" (fun _ ->
     CleanDirs ["bin"; "temp"]
@@ -114,7 +112,7 @@ Target "CleanDocs" (fun _ ->
 
 Target "BuildStackExchangeRedis" (fun _ ->
     "StackExchange.Redis/StackExchange.Redis/bin/mono/StackExchange.Redis.dll"
-        |> CopyFile ("packages/StackExchange.Redis.1.0.371/lib/net45/")
+        |> CopyFile ("packages/StackExchange.Redis/lib/net45/")
 )
 
 // --------------------------------------------------------------------------------------
@@ -132,7 +130,7 @@ Target "Build" (fun _ ->
 
 Target "StartRedis" (fun _ ->
     async {
-        Shell.Exec("./packages/Redis-64.2.8.17/redis-server.exe", "--maxheap 200mb") |> ignore
+        Shell.Exec("./packages/Redis-64/redis-server.exe", "--maxheap 200mb") |> ignore
     } |> Async.Start
 )
 
@@ -268,7 +266,6 @@ Target "BuildPackage" DoNothing
 Target "All" DoNothing
 
 "Clean"
-  ==> "RestorePackages"
   ==> "AssemblyInfo"
   #if MONO
   ==> "BuildStackExchangeRedis"

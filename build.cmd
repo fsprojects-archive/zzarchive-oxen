@@ -1,17 +1,19 @@
 @echo off
 cls
 
-IF NOT EXIST packages\FAKE\tools\FAKE.exe  (
-  .nuget\nuget.exe install FAKE -OutputDirectory packages -ExcludeVersion
-  .nuget\nuget.exe install SourceLink.Fake -OutputDirectory packages -ExcludeVersion
+.paket\paket.bootstrapper.exe
+if errorlevel 1 (
+  exit /b %errorlevel%
+)
+
+.paket\paket.exe restore
+if errorlevel 1 (
+  exit /b %errorlevel%
 )
 
 IF NOT EXIST build.fsx (
+  .paket\paket.exe update
   packages\FAKE\tools\FAKE.exe init.fsx
-)
-
-IF NOT EXIST packages\xunit.runner.console\tools\xunit.console.x86.exe (
-  .nuget\nuget.exe install xunit.runner.console -OutputDirectory packages -ExcludeVersion
 )
 
 packages\FAKE\tools\FAKE.exe build.fsx %*

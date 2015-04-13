@@ -1,0 +1,10 @@
+Foq
+FsUnit.xUnit
+log4net
+Microsoft.Bcl
+Microsoft.Bcl.Async
+Microsoft.Bcl.Build
+Newtonsoft.Json
+StackExchange.Redis
+xunit
+xunit.runner.visualstudio

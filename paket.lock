@@ -1,0 +1,39 @@
+NUGET
+  remote: https://nuget.org/api/v2
+  specs:
+    BookSleeve (1.3.41)
+    FAKE (3.28.2)
+    Foq (1.6) - framework: >= net40
+    FSharp.Compiler.Service (0.0.88)
+    FSharp.Formatting (2.8.0)
+      FSharp.Compiler.Service (>= 0.0.86)
+      FSharpVSPowerTools.Core (>= 1.7.0)
+    FSharpVSPowerTools.Core (1.8.0)
+      FSharp.Compiler.Service (>= 0.0.87)
+    FsUnit.xUnit (1.3.0.1) - framework: >= net40
+      xunit (>= 1.9.1 < 3.0) - framework: net20, >= net40, >= net45
+    log4net (2.0.3) - framework: >= net451
+    Microsoft.Bcl (1.1.10)
+      Microsoft.Bcl.Build (>= 1.0.14)
+    Microsoft.Bcl.Async (1.0.168)
+      Microsoft.Bcl (>= 1.1.8)
+    Microsoft.Bcl.Build (1.0.21)
+    Microsoft.Net.Http (2.2.29)
+      Microsoft.Bcl (>= 1.1.10)
+      Microsoft.Bcl.Build (>= 1.0.14)
+    Moq (4.2.1502.0911)
+    Newtonsoft.Json (6.0.8) - framework: >= net451
+    NuGet.CommandLine (2.8.5)
+    NUnit (2.6.4)
+    Octokit (0.9.0)
+      Microsoft.Net.Http
+    SourceLink.Fake (0.5.0)
+    StackExchange.Redis (1.0.371) - framework: >= net451
+    xunit (1.9.2) - framework: >= net451
+    xunit.runner.console (2.0.0)
+    xunit.runner.visualstudio (2.0.0-rc1-build1030) - framework: >= net451
+GITHUB
+  remote: fsharp/FAKE
+  specs:
+    modules/Octokit/Octokit.fsx (126368f5499c21a8c68f284a2ac008ba6fa437a6)
+      Octokit
