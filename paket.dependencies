@@ -1,13 +1,6 @@
 source https://nuget.org/api/v2
 
-nuget BookSleeve
 nuget FSharp.Formatting
-nuget Microsoft.Bcl
-nuget Microsoft.Bcl.Async
-nuget Microsoft.Bcl.Build
-nuget Moq
-nuget NUnit
-nuget Nuget.CommandLine
 nuget FAKE
 nuget SourceLink.Fake
 nuget Foq 1.6 framework: >= net40
