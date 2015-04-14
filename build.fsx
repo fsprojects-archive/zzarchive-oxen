@@ -8,6 +8,7 @@ open Fake
 open Fake.Git
 open Fake.AssemblyInfoFile
 open Fake.ReleaseNotesHelper
+open Fake.FileUtils
 open System
 #if MONO
 #else
@@ -103,14 +104,22 @@ Target "AssemblyInfo" (fun _ ->
 // Clean build results
 
 Target "Clean" (fun _ ->
-    CleanDirs ["bin"; "temp"]
+    CleanDirs ["bin"; "temp"; "StackExchange.Redis"]
 )
 
 Target "CleanDocs" (fun _ ->
     CleanDirs ["docs/output"]
 )
 
+Target "CloneStackExchangeRedis" (fun _ ->
+    Repository.clone "./" "https://github.com/StackExchange/StackExchange.Redis" "StackExchange.Redis"
+)
+
 Target "BuildStackExchangeRedis" (fun _ ->
+    Shell.Exec("StackExchange.Redis/monobuild.bash", "", "StackExchange.Redis") |> ignore
+)
+
+Target "CopyStackExchangeRedis" (fun _ ->
     "StackExchange.Redis/StackExchange.Redis/bin/mono/StackExchange.Redis.dll"
         |> CopyFile ("packages/StackExchange.Redis/lib/net45/")
 )
@@ -268,7 +277,9 @@ Target "All" DoNothing
 "Clean"
   ==> "AssemblyInfo"
   #if MONO
+  ==> "CloneStackExchangeRedis"
   ==> "BuildStackExchangeRedis"
+  ==> "CopyStackExchangeRedis"
   #endif
   ==> "Build"
   #if MONO
