@@ -1,5 +1,5 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/m9ho080voc0yif7o/branch/master?svg=true)](https://ci.appveyor.com/project/albertjan/oxen-mcer1/branch/master)
-[![Build Status](https://travis-ci.org/fsprojects/oxen.svg?branch=master)](https://travis-ci.org/curit/oxen)
+[![Build Status](https://travis-ci.org/fsprojects/oxen.svg?branch=master)](https://travis-ci.org/fsprojects/oxen)
 
 # Oxen
 > like bull but functional
