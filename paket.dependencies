@@ -11,5 +11,6 @@ nuget StackExchange.Redis 1.0.371 framework: >= net451
 nuget xunit 1.9.2 framework: >= net451
 nuget xunit.runner.visualstudio 2.0.0-rc1-build1030 framework: >= net451
 nuget xunit.runner.console
+nuget Redis-64
 
 github fsharp/FAKE modules/Octokit/Octokit.fsx
