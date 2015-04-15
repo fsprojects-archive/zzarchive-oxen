@@ -180,3 +180,8 @@ nuget/*.nupkg
 dump.rdb
 node_modules/
 StackExchange.Redis/
+
+.paket/paket.exe
+paket-files/
+tests/oxen.Tests/net40/*
+tests/oxen.Tests/net45/*

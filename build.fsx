@@ -8,6 +8,7 @@ open Fake
 open Fake.Git
 open Fake.AssemblyInfoFile
 open Fake.ReleaseNotesHelper
+open Fake.FileUtils
 open System
 #if MONO
 #else
@@ -52,13 +53,13 @@ let testAssemblies = "tests/**/bin/Release/*Tests*.dll"
 
 // Git configuration (used for publishing documentation in gh-pages branch)
 // The profile where the project is posted
-let gitHome = "https://github.com/curit"
+let gitHome = "https://github.com/fsprojects"
 
 // The name of the project on GitHub
 let gitName = "oxen"
 
 // The url for the raw files hosted
-let gitRaw = environVarOrDefault "gitRaw" "https://raw.github.com/curit"
+let gitRaw = environVarOrDefault "gitRaw" "https://raw.github.com/fsprojects"
 
 // --------------------------------------------------------------------------------------
 // END TODO: The rest of the file includes standard build steps
@@ -100,21 +101,27 @@ Target "AssemblyInfo" (fun _ ->
 )
 
 // --------------------------------------------------------------------------------------
-// Clean build results & restore NuGet packages
-
-Target "RestorePackages" RestorePackages
+// Clean build results
 
 Target "Clean" (fun _ ->
-    CleanDirs ["bin"; "temp"]
+    CleanDirs ["bin"; "temp"; "StackExchange.Redis"]
 )
 
 Target "CleanDocs" (fun _ ->
     CleanDirs ["docs/output"]
 )
 
+Target "CloneStackExchangeRedis" (fun _ ->
+    Repository.clone "./" "https://github.com/StackExchange/StackExchange.Redis" "StackExchange.Redis"
+)
+
 Target "BuildStackExchangeRedis" (fun _ ->
+    Shell.Exec("sh", "monobuild.bash", "StackExchange.Redis") |> ignore
+)
+
+Target "CopyStackExchangeRedis" (fun _ ->
     "StackExchange.Redis/StackExchange.Redis/bin/mono/StackExchange.Redis.dll"
-        |> CopyFile ("packages/StackExchange.Redis.1.0.371/lib/net45/")
+        |> CopyFile ("packages/StackExchange.Redis/lib/net45/")
 )
 
 // --------------------------------------------------------------------------------------
@@ -132,7 +139,7 @@ Target "Build" (fun _ ->
 
 Target "StartRedis" (fun _ ->
     async {
-        Shell.Exec("./packages/Redis-64.2.8.17/redis-server.exe", "--maxheap 200mb") |> ignore
+        Shell.Exec("./packages/Redis-64/redis-server.exe", "--maxheap 200mb") |> ignore
     } |> Async.Start
 )
 
@@ -268,10 +275,11 @@ Target "BuildPackage" DoNothing
 Target "All" DoNothing
 
 "Clean"
-  ==> "RestorePackages"
   ==> "AssemblyInfo"
   #if MONO
+  ==> "CloneStackExchangeRedis"
   ==> "BuildStackExchangeRedis"
+  ==> "CopyStackExchangeRedis"
   #endif
   ==> "Build"
   #if MONO

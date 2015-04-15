@@ -10,9 +10,5 @@ install:
   - brew install redis
   - redis-server /usr/local/etc/redis.conf &
 
-script: 
-  - git clone https://github.com/StackExchange/StackExchange.Redis.git
-  - cd StackExchange.Redis
-  - ./monobuild.bash
-  - cd ..
+script:
   - ./build.sh All
