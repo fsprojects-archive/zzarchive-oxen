@@ -116,7 +116,7 @@ Target "CloneStackExchangeRedis" (fun _ ->
 )
 
 Target "BuildStackExchangeRedis" (fun _ ->
-    Shell.Exec("StackExchange.Redis/monobuild.bash", "", "StackExchange.Redis") |> ignore
+    Shell.Exec("sh", "monobuild.bash", "StackExchange.Redis") |> ignore
 )
 
 Target "CopyStackExchangeRedis" (fun _ ->
