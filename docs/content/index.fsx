@@ -71,9 +71,9 @@ The library is available under Public Domain license, which allows modification 
 redistribution for both commercial and non-commercial purposes. For more information see the 
 [License file][license] in the GitHub repository. 
 
-  [content]: https://github.com/curit/oxen/tree/master/docs/content
-  [gh]: https://github.com/curit/oxen/
-  [issues]: https://github.com/curit/oxen/issues
-  [readme]: https://github.com/curit/oxen/master/README.md
-  [license]: https://github.com/curit/oxen/blob/master/LICENSE.txt
+  [content]: https://github.com/fsprojects/oxen/tree/master/docs/content
+  [gh]: https://github.com/fsprojects/oxen/
+  [issues]: https://github.com/fsprojects/oxen/issues
+  [readme]: https://github.com/fsprojects/oxen/master/README.md
+  [license]: https://github.com/fsprojects/oxen/blob/master/LICENSE.txt
 *)

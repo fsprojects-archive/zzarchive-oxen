@@ -5,9 +5,9 @@
     <version>@build.number@</version>
     <authors>@authors@</authors>
     <owners>@authors@</owners>
-    <licenseUrl>http://github.com/curit/oxen/blob/master/LICENSE.txt</licenseUrl>
-    <projectUrl>http://curit.github.io/oxen</projectUrl>
-    <iconUrl>https://raw.githubusercontent.com/fsprojects/ProjectScaffold/master/docs/files/img/logo.png</iconUrl>
+    <licenseUrl>http://github.com/fsprojects/oxen/blob/master/LICENSE.txt</licenseUrl>
+    <projectUrl>http://fsprojects.github.io/oxen</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/fsprojects/oxen/master/docs/files/img/logo.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <summary>@summary@</summary>
     <description>@description@</description>
