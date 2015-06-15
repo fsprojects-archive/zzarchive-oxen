@@ -332,7 +332,6 @@ type QueueFixture () =
 
 
         let waitForQueueToFinish (queue:Queue<_>) =
-            let db = mp.GetDatabase ()
             let rec wait () =
                 async {
                     let! waiting = queue.getWaiting()
@@ -353,7 +352,7 @@ type QueueFixture () =
 
             async {
                 // When
-                do queue.add({value = "test"}) |> Async.Ignore |> Async.Start
+                do! queue.add({value = "test"}) |> Async.Ignore |> Async.StartChild  |> Async.Ignore
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
                 let! active = queue.getActive()
                 let! completed = queue.getCompleted()
@@ -374,7 +373,7 @@ type QueueFixture () =
 
             async {
                 // When
-                do queue.add({Value = "test"}) |> Async.Ignore |> Async.Start
+                do! queue.add({Value = "test"}) |> Async.Ignore |> Async.StartChild |> Async.Ignore
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
                 let! active = queue.getActive()
                 let! completed = queue.getCompleted()
@@ -595,6 +594,7 @@ type QueueFixture () =
             async {
                 // Given
                 let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let mp2 = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queuename = (Guid.NewGuid ()).ToString()
                 let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
                 queue.``process`` (fun j ->
@@ -603,7 +603,7 @@ type QueueFixture () =
                         Debug.Print "huuu"
                     })
 
-                let queue2 = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                let queue2 = Queue<Data>(queuename, mp2.GetDatabase, mp2.GetSubscriber)
                 queue2.``process`` (fun j ->
                     async {
                         Debug.Print (j.jobId.ToString ())

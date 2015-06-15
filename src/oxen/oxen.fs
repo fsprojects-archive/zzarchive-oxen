@@ -215,13 +215,15 @@ type Job<'a> =
                     then multi.ListRightPushAsync (key, toValueI64 this.jobId)
                     else multi.ListLeftPushAsync (key, toValueI64 this.jobId)
 
-            let result =  multi.PublishAsync (this.queue.toKey("jobs") |> keyToChannel, toValueI64 this.jobId)
+            let result =  multi.PublishAsync (this.queue.toKey("jobs") |> keyToChannel, toValueI64 this.jobId) |> Async.AwaitTask
            
             let! executed = multi.ExecuteAsync() |> Async.AwaitTask
 
             if not executed then failwith "an error occurred while executing a redis transaction"
 
-            if result.Result < 1L then failwith "must have atleast one subscriber, me"
+            let! result = result
+
+            if result < 1L then failwith "must have atleast one subscriber, me"
 
             return this
         }
@@ -590,14 +592,16 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                     if opts.ContainsKey "lifo" && bool.Parse (opts.Item "lifo")
                     then multi.ListRightPushAsync (key, toValueI64 jobId)
                     else multi.ListLeftPushAsync (key, toValueI64 jobId)
-
-            let result =  multi.PublishAsync (newJobChannel, toValueI64 jobId)
+                     
+            let result =  multi.PublishAsync (newJobChannel, toValueI64 jobId) |> Async.AwaitTask
 
             let! executed = multi.ExecuteAsync() |> Async.AwaitTask
 
+            let! result = result
+
             if not executed then failwith "an error occurred while executing a redis transaction"
 
-            if result.Result < 1L then failwith "must have atleast one subscriber, me"
+            if result < 1L then failwith "must have atleast one subscriber, me"
 
             return job
         }
@@ -643,12 +647,17 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         async {
             logger.Info "getting queue length for queue %s" name
             let multi = (this.client ()).CreateTransaction()
-            let waitLength = multi.ListLengthAsync (this.toKey("wait"))
-            let pausedLength = multi.ListLengthAsync (this.toKey("paused"))
-            let delayedLength = multi.SortedSetLengthAsync (this.toKey("delayed"))
+            let waitLength = multi.ListLengthAsync (this.toKey("wait")) |> Async.AwaitTask
+            let pausedLength = multi.ListLengthAsync (this.toKey("paused")) |> Async.AwaitTask
+            let delayedLength = multi.SortedSetLengthAsync (this.toKey("delayed")) |> Async.AwaitTask
             do! multi.ExecuteAsync () |> Async.AwaitTask |> Async.Ignore
-            let length = [| waitLength.Result; pausedLength.Result; |] |> Seq.max
-            return length + delayedLength.Result
+
+            let! waitLength = waitLength
+            let! pausedLength = pausedLength
+            let! delayedLength = delayedLength
+
+            let length = [| waitLength; pausedLength; |] |> Seq.max
+            return length + delayedLength
         }
 
     /// empty the queue doesn't remove the jobs just removes the wait list so it won't do anything else.
@@ -656,15 +665,18 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         async {
             logger.Info "emptying queue %s" name
             let multi = (this.client ()).CreateTransaction()
-            let waiting = multi.ListRangeAsync (this.toKey("wait"), 0L, -1L)
-            let paused = multi.ListRangeAsync (this.toKey("paused"), 0L, -1L)
+            let waitingTask = multi.ListRangeAsync (this.toKey("wait"), 0L, -1L)
+            let pausedTask = multi.ListRangeAsync (this.toKey("paused"), 0L, -1L)
             do multi.KeyDeleteAsync(this.toKey("wait")) |> ignore
             do multi.KeyDeleteAsync(this.toKey("paused")) |> ignore
             do multi.KeyDeleteAsync(this.toKey("meta-paused")) |> ignore
             do multi.KeyDeleteAsync(this.toKey("delayed")) |> ignore
             do multi.ExecuteAsync() |> ignore
 
-            let jobKeys = Array.concat [|waiting.Result; paused.Result|]
+            let! waiting = waitingTask |> Async.AwaitTask
+            let! paused = pausedTask |> Async.AwaitTask
+
+            let jobKeys = Array.concat [|waiting; paused|]
             let multi2 = (this.client ()).CreateTransaction()
             jobKeys |> Seq.iter (fun k -> multi2.KeyDeleteAsync(valueToKeyLong k) |> ignore)
             return! multi2.ExecuteAsync () |> Async.AwaitTask
