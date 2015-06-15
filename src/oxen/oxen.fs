@@ -565,11 +565,10 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     /// run the handler.
     /// note: (you should probably use: ``process`` but if you want to keep the returned async to control it cancel it for example, use this.)
-    /// note 2: (async switches to a different thread)
     member x.run handler =
         async {
-            do! Async.SwitchToNewThread ()
-            do! [| (processStalledJobs handler); (processJobs handler) |] |> Async.Parallel |> Async.Ignore
+            do! processStalledJobs handler
+            do! processJobs handler 
         }
 
     /// add a job to the queue.
