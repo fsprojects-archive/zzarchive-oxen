@@ -1,40 +1,34 @@
 NUGET
   remote: https://nuget.org/api/v2
   specs:
-    FAKE (3.28.4)
-    Foq (1.6)
-    FSharp.Compiler.Service (0.0.67)
-    FSharp.Formatting (2.4.29)
-      FSharp.Compiler.Service (>= 0.0.62)
-      Microsoft.AspNet.Razor (2.0.30506.0)
-      RazorEngine (3.3.0)
-    FsUnit.xUnit (1.3.0.1)
-      xunit (>= 1.9.1 <  3.0) - net20, >= net40, >= net45
-    log4net (2.0.3)
-    Microsoft.AspNet.Razor (2.0.30506.0)
-    Microsoft.Bcl (1.1.10) - >= net40 < net45
+    FAKE (4.0.2)
+    Foq (1.7.1) - framework: >= net40
+    FSharp.Compiler.Service (1.3.1.0)
+    FSharp.Formatting (2.10.0)
+      FSharp.Compiler.Service (>= 0.0.87)
+      FSharpVSPowerTools.Core (1.8.0)
+    FSharpVSPowerTools.Core (1.8.0)
+      FSharp.Compiler.Service (>= 0.0.87)
+    FsUnit.xUnit (1.3.1.0) - framework: >= net40
+      xunit (1.9.2)
+    log4net (2.0.3) - framework: >= net451
+    Microsoft.Bcl (1.1.10)
       Microsoft.Bcl.Build (>= 1.0.14)
-    Microsoft.Bcl.Async (1.0.168) - >= net40 < net45
-      Microsoft.Bcl (>= 1.1.8)
     Microsoft.Bcl.Build (1.0.21)
     Microsoft.Net.Http (2.2.29)
       Microsoft.Bcl (>= 1.1.10)
       Microsoft.Bcl.Build (>= 1.0.14)
-    Newtonsoft.Json (6.0.8)
-    Octokit (0.9.0)
+    Newtonsoft.Json (7.0.1) - framework: >= net451
+    Octokit (0.14.0)
       Microsoft.Net.Http
-    RazorEngine (3.3.0)
-      Microsoft.AspNet.Razor (>= 2.0.30506.0)
-    Redis-64 (2.8.19)
-    SourceLink.Fake (0.5.0)
-    StackExchange.Redis (1.0.371)
-      Microsoft.Bcl (>= 1.1.9) - >= net40 < net45
-      Microsoft.Bcl.Async (>= 1.0.168) - >= net40 < net45
+    Redis-64 (2.8.21)
+    SourceLink.Fake (1.0.0)
+    StackExchange.Redis (1.0.481) - framework: >= net451
     xunit (1.9.2)
     xunit.runner.console (2.0.0)
-    xunit.runner.visualstudio (2.0.0-rc1-build1030)
+    xunit.runner.visualstudio (2.0.1) - framework: >= net451
 GITHUB
   remote: fsharp/FAKE
   specs:
-    modules/Octokit/Octokit.fsx (f59b0ae8ce18c8b783892ffd4c4bd09ceea46692)
+    modules/Octokit/Octokit.fsx (69ef5a5ccc1ece211a241fa43781b53d49e58475)
       Octokit
