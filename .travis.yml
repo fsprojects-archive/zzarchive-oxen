@@ -2,9 +2,8 @@ language: csharp
 
 sudo: false
 
-install:
-  - brew install redis
-  - redis-server /usr/local/etc/redis.conf &
+services:
+  - redis-server
 
 script:
   - ./build.sh All
