@@ -7,8 +7,6 @@
     // log4f
     type internal Logger(logger: ILog) =
 
-        do log4net.Config.XmlConfigurator.ConfigureAndWatch (FileInfo "log4net.config") |> ignore
-
         member __.RawILog = logger
         member __.IsDebugEnabled = logger.IsDebugEnabled
         member __.IsInfoEnabled = logger.IsInfoEnabled
