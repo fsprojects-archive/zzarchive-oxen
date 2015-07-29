@@ -1,14 +1,9 @@
-language: objective-c
+language: csharp
 
-env:
-  matrix:
-    - MONO_VERSION="3.12.0"
+sudo: false
 
-install:
-  - wget "http://download.mono-project.com/archive/${MONO_VERSION}/macos-10-x86/MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg"
-  - sudo installer -pkg "MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg" -target /
-  - brew install redis
-  - redis-server /usr/local/etc/redis.conf &
+services:
+  - redis-server
 
 script:
   - ./build.sh All
