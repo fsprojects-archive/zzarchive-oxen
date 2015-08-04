@@ -52,7 +52,11 @@ type JobFixture () =
     let ``should create a new job from given json data`` () =
         // Given
         let db = Mock<IDatabase>().Create();
-        let sub = Mock<ISubscriber>().Create();
+        let sub = Mock<ISubscriber>.With(fun s ->
+            <@
+                s.PublishAsync(any(), any(), any()) --> taskLong()
+            @>
+        )
 
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
@@ -72,8 +76,11 @@ type JobFixture () =
                 d.HashGetAllAsync (any(), any()) --> taskJobHash()
             @>
         )
-        let sub = Mock<ISubscriber>().Create();
-
+        let sub = Mock<ISubscriber>.With(fun s ->
+            <@
+                s.PublishAsync(any(), any(), any()) --> taskLong()
+            @>
+        )
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
         // When
@@ -92,7 +99,11 @@ type JobFixture () =
                 d.StringSetAsync (any(), any(), any(), any()) --> taskTrue()
             @>
         )
-        let sub = Mock<ISubscriber>().Create();
+        let sub = Mock<ISubscriber>.With(fun s ->
+            <@
+                s.PublishAsync(any(), any(), any()) --> taskLong()
+            @>
+        )
 
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
         let job = {
@@ -122,7 +133,11 @@ type JobFixture () =
                 d.StringSetAsync (any(), any(), any(), any()) --> taskTrue()
             @>
         )
-        let sub = Mock<ISubscriber>().Create();
+        let sub = Mock<ISubscriber>.With(fun s ->
+            <@
+                s.PublishAsync(any(), any(), any()) --> taskLong()
+            @>
+        )
 
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
         let job = {
@@ -163,7 +178,11 @@ type JobFixture () =
                     d.CreateTransaction() --> trans
                 @>
             )
-            let sub = Mock<ISubscriber>().Create();
+            let sub = Mock<ISubscriber>.With(fun s ->
+                <@
+                    s.PublishAsync(any(), any(), any()) --> taskLong()
+                @>
+            )
 
             let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
             let! job = Job<Data>.create(q, 1L, { value = "test" }, None)
@@ -199,7 +218,11 @@ type QueueFixture () =
                 d.CreateTransaction(any()) --> trans
             @>
         )
-        let sub = Mock<ISubscriber>().Create()
+        let sub = Mock<ISubscriber>.With(fun s ->
+            <@
+                s.PublishAsync(any(), any(), any()) --> taskLong()
+            @>
+        )
         let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
         // When
@@ -217,7 +240,11 @@ type QueueFixture () =
     let ``toKey should return a key that works with bull`` () =
         // Given
         let db = Mock<IDatabase>().Create();
-        let sub = Mock<ISubscriber>().Create();
+        let sub = Mock<ISubscriber>.With(fun s ->
+            <@
+                s.PublishAsync(any(), any(), any()) --> taskLong()
+            @>
+        )
 
         let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
@@ -230,6 +257,7 @@ type QueueFixture () =
     [<Fact>]
     let ``report progress and listen to event on queue`` () =
         async {
+            // Given
             let trans = Mock<ITransaction>.With(fun t ->
                 <@
                     t.ListLeftPushAsync(any(), any(), any(), any()) --> taskLPush()
@@ -237,7 +265,7 @@ type QueueFixture () =
                     t.ExecuteAsync () --> taskTrue()
                 @>
             )
-            // Given
+
             let db = Mock<IDatabase>.With(fun d ->
                 <@
                     d.HashSetAsync(any(), any()) --> taskUnit()
@@ -246,7 +274,11 @@ type QueueFixture () =
                 @>
             )
 
-            let sub = Mock<ISubscriber>().Create()
+            let sub = Mock<ISubscriber>.With(fun s ->
+                <@
+                    s.PublishAsync(any(), any(), any()) --> taskLong()
+                @>
+            )
 
             let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
@@ -293,7 +325,11 @@ type QueueFixture () =
                     d.HashGetAllAsync(any()) --> taskJobHash()
                 @>
             )
-            let sub = Mock<ISubscriber>().Create()
+            let sub = Mock<ISubscriber>.With(fun s ->
+                <@
+                    s.PublishAsync(any(), any(), any()) --> taskLong()
+                @>
+            )
 
             let queue = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
             let! job = queue.add({ value = "test" });
@@ -325,7 +361,7 @@ type QueueFixture () =
 
     type IntegrationTests () =
         let logger = LogManager.getNamedLogger "IntegrationTests"
-        let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+        let mp = ConnectionMultiplexer.Connect("127.0.0.1, allowAdmin=true")
         let q = Queue<TestControlMessage>("test-control-messages", mp.GetDatabase, mp.GetSubscriber)
         let sendJobWithBull queue times =
             q.add({ times = times; queueName = queue }) |> Async.RunSynchronously
