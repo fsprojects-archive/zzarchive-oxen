@@ -373,9 +373,12 @@ and OxenNewJobEvent =
     {
         jobId: int64
     }
+
+and OxenJobEventDelegate<'a> = delegate of obj * OxenJobEvent<'a> -> unit
+
 /// [omit]
 and Events<'a> = {
-    Completed: IEvent<OxenJobEvent<'a>>
+    Completed: IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
     Progress: IEvent<OxenJobEvent<'a>>
     Failed: IEvent<OxenJobEvent<'a>>
     Paused: IEvent<OxenQueueEvent<'a>>
@@ -409,6 +412,14 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
 
     override x.Finalize () =
         x.Dispose(false)
+
+and IOxenQueue<'a> =
+    abstract member Process: (Func<Job<'a>, Task>) -> unit
+    abstract member Add: 'a -> Task<Job<'a>>
+    abstract member Add: 'a * Dictionary<string, string> -> Task<Job<'a>>
+
+    [<CLIEvent>]
+    abstract member OnJobCompleted : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
 
 /// <summary>
 /// The queue
@@ -477,13 +488,14 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     let token = Guid.NewGuid ()
 
-    let completedEvent = new Event<OxenJobEvent<'a>> ()
+    let completedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
     let progressEvent = new Event<OxenJobEvent<'a>> ()
     let failedEvent = new Event<OxenJobEvent<'a>> ()
     let pausedEvent = new Event<OxenQueueEvent<'a>> ()
     let resumedEvent = new Event<OxenQueueEvent<'a>> ()
     let newJobEvent = new Event<OxenNewJobEvent> ()
     let onNewJob = newJobEvent.Publish
+    let onCompleted = completedEvent.Publish
 
     let processJob handler job =
         async {
@@ -562,9 +574,31 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel |> Async.Ignore
         }
 
+    // c# façade
+    interface IOxenQueue<'a> with
+        member this.Add (data) =
+            this.add(data) |> Async.StartAsTask
+               
+        member this.Add (data, options) = 
+            let opts = options |> Seq.map (fun i -> (i.Key, i.Value)) |> Seq.toList
+            this.add(data, opts) |> Async.StartAsTask
+
+        member this.Process(handler) = 
+            this.``process``(fun j -> handler.Invoke(j) |> Async.awaitPlainTask)   
+        
+        [<CLIEvent>]
+        member this.OnJobCompleted = onCompleted
+
+
     /// create a new queue
     new (name, mp:ConnectionMultiplexer) =
         Queue<'a>(name, mp.GetDatabase, mp.GetSubscriber)
+
+    /// create a new queue using factory funcs in c#
+    new (name, dbFactory:Func<IDatabase>, subFactory:Func<ISubscriber>) =
+        let dbFactory () = dbFactory.Invoke()
+        let subFactory () = subFactory.Invoke()
+        Queue<'a>(name, dbFactory, subFactory, false)
 
     /// the name of the queue use this to uniquely identify the queue. (note: will be used in the redis keys like "bull:<queuename>:wait"
     member x.name = name
@@ -743,7 +777,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     member x.on = {
         Paused = pausedEvent.Publish
         Resumed = resumedEvent.Publish
-        Completed = completedEvent.Publish
+        Completed = onCompleted
         Progress = progressEvent.Publish
         Failed = failedEvent.Publish
         NewJob = onNewJob
@@ -777,7 +811,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 }
 
             match eventType with
-            | Completed -> completedEvent.Trigger(eventData)
+            | Completed -> completedEvent.Trigger(x, eventData)
             | Progress -> progressEvent.Trigger(eventData)
             | Failed -> failedEvent.Trigger(eventData)
             | _ -> failwith "Not a job event!"

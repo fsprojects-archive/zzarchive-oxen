@@ -188,3 +188,4 @@ tests/oxen.Tests/net40/*
 tests/oxen.Tests/net45/*
 
 .fake/
+docs/tools/FSharp.Formatting.svclog
