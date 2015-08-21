@@ -113,7 +113,6 @@ Target "CleanDocs" (fun _ ->
 
 Target "CloneStackExchangeRedis" (fun _ ->
     Repository.clone "./" "https://github.com/StackExchange/StackExchange.Redis" "StackExchange.Redis"
-    Branches.checkoutBranch "./StackExchange.Redis" "83a046eb87dedb49d3c6dcf599d48edf0753a92f"
 )
 
 Target "BuildStackExchangeRedis" (fun _ ->
