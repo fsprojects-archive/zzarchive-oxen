@@ -21,6 +21,7 @@
         public async Task ShouldBeAbleToAddAJobFromCSharpWithEase()
         {
             // Given
+            // Transaction mock for adding the job to the wait list and sending a pubsub message
             var transactionMock = new Mock<ITransaction>();
             transactionMock
                 .Setup(t => t.ListLeftPushAsync(It.IsAny<RedisKey>(), It.IsAny<RedisValue>(), It.IsAny<When>(), It.IsAny<CommandFlags>()))
@@ -32,6 +33,7 @@
                 .Setup(t => t.ExecuteAsync(It.IsAny<CommandFlags>()))
                 .Returns(Task.FromResult(true));
            
+            // Database mock so you can add a job
             var databaseMock = new Mock<IDatabase>();
             databaseMock
                 .Setup(d => d.HashSetAsync(It.IsAny<RedisKey>(), It.IsAny<HashEntry[]>(), It.IsAny<CommandFlags>()))
@@ -43,6 +45,7 @@
                 .Setup(d => d.CreateTransaction(null))
                 .Returns(transactionMock.Object);
 
+            // So oxen can verify the internal subscription was successful
             var subscriberMock = new Mock<ISubscriber>();
             subscriberMock
                 .Setup(s => s.PublishAsync(It.IsAny<RedisChannel>(), It.IsAny<RedisValue>(), It.IsAny<CommandFlags>()))
@@ -50,7 +53,7 @@
 
             IOxenQueue<Message> queue = new Queue<Message>("test-queue", () => databaseMock.Object, () => subscriberMock.Object);
 
-            //When
+            // When
             var job = await queue.Add(new Message()
             {
                 OtherThing = false,
@@ -75,7 +78,7 @@
             // Given
             Action<RedisChannel, RedisValue> newJobHandler = (a, b) => { throw new Exception("shouldn't be called"); };
 
-            // Transactie mock voor het plaatsen van een nieuwe job
+            // Transaction mock for moving the job to active and completed
             var transactionMock = new Mock<ITransaction>();
 
             // moveToSet
@@ -89,7 +92,7 @@
                 .Setup(t => t.ExecuteAsync(It.IsAny<CommandFlags>()))
                 .Returns(Task.FromResult(true));
 
-            // Database mock voor het verhuizen in 1 stap van de e
+            // Database so there's a job when you ask for one
             var databaseMock = new Mock<IDatabase>();
             databaseMock
                 .Setup(d => d.CreateTransaction(null))
@@ -124,6 +127,7 @@
                 .Setup(s => s.Subscribe("bull:test-queue:jobs", It.IsAny<Action<RedisChannel, RedisValue>>(), It.IsAny<CommandFlags>()))
                 .Callback<RedisChannel, Action<RedisChannel, RedisValue>, CommandFlags>((channel, handler, flags) => newJobHandler = handler);
 
+            // When
             var signal = new SemaphoreSlim(0, 1);
 
             IOxenQueue<Message> queue = new Queue<Message>("test-queue", () => databaseMock.Object, () => subscriberMock.Object);
@@ -131,7 +135,9 @@
             var called = false;
             queue.Process(async job =>
             {
-                await Task.Run(() => job.jobId.ShouldEqual(1L));
+                job.jobId.ShouldEqual(1L);
+                job.data.OtherThing.ShouldBeTrue();
+                job.data.Thing.ShouldEqual("yes");
                 called = true;
             });
 
@@ -140,9 +146,9 @@
             queue.OnJobCompleted += (obj0, obj1) => signal.Release();
 
             await signal.WaitAsync();
-
+    
+            // Then
             called.ShouldBeTrue();
-
         }
     }
 }
