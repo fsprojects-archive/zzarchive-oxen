@@ -373,14 +373,21 @@ and OxenNewJobEvent =
     {
         jobId: int64
     }
+
+and OxenJobEventDelegate<'a> = delegate of obj * OxenJobEvent<'a> -> unit
+
+and OxenQueueEventDelegate<'a> = delegate of obj * OxenQueueEvent<'a> -> unit
+
+and OxenNewJobEventDelegate = delegate of obj * OxenNewJobEvent -> unit
+
 /// [omit]
 and Events<'a> = {
-    Completed: IEvent<OxenJobEvent<'a>>
-    Progress: IEvent<OxenJobEvent<'a>>
-    Failed: IEvent<OxenJobEvent<'a>>
-    Paused: IEvent<OxenQueueEvent<'a>>
-    Resumed: IEvent<OxenQueueEvent<'a>>
-    NewJob: IEvent<OxenNewJobEvent>
+    Completed: IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    Progress: IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    Failed: IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    Paused: IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    Resumed: IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    NewJob: IEvent<OxenNewJobEventDelegate, OxenNewJobEvent>
 }
 /// [omit]
 and LockRenewer<'a> (job:Job<'a>, token:Guid) =
@@ -410,6 +417,25 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
     override x.Finalize () =
         x.Dispose(false)
 
+and IOxenQueue<'a> =
+    abstract member Process: (Func<Job<'a>, Task>) -> unit
+    abstract member Add: 'a -> Task<Job<'a>>
+    abstract member Add: 'a * Dictionary<string, string> -> Task<Job<'a>>
+
+    [<CLIEvent>]
+    abstract member OnJobCompleted : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    [<CLIEvent>]
+    abstract member OnJobFailed : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    [<CLIEvent>]
+    abstract member OnJobProgress : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    [<CLIEvent>]
+    abstract member OnQueuePaused : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    [<CLIEvent>]
+    abstract member OnQueueResumed : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    [<CLIEvent>]
+    abstract member OnNewJob : IEvent<OxenNewJobEventDelegate, OxenNewJobEvent>
+
+
 /// <summary>
 /// The queue
 /// </summary>
@@ -436,13 +462,28 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let resumedChannel = _toKey("resumed") |> keyToChannel
     let pausedChannel = _toKey("paused") |> keyToChannel
 
+    let completedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
+    let progressEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
+    let failedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
+    let pausedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
+    let resumedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
+    let newJobEvent = new Event<OxenNewJobEventDelegate, OxenNewJobEvent> ()
+    
+    
+    let onCompleted = completedEvent.Publish
+    let onFailed = failedEvent.Publish
+    let onProgress = progressEvent.Publish
+    let onPaused = pausedEvent.Publish
+    let onResumed = resumedEvent.Publish
+    let onNewJob = newJobEvent.Publish
+
     let sub = subscriberFactory ()
     do sub.Subscribe(
                 newJobChannel,
                 (fun c v ->
                     async {
                         let jobId = v |> int64
-                        return! this.emitNewJobEvent(jobId)
+                        newJobEvent.Trigger(this, { jobId = jobId })
                     } |> Async.RunSynchronously))
 
     let rec ensureSubscription () =
@@ -476,14 +517,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     do logger.Info "subscribed to %A" newJobChannel
 
     let token = Guid.NewGuid ()
-
-    let completedEvent = new Event<OxenJobEvent<'a>> ()
-    let progressEvent = new Event<OxenJobEvent<'a>> ()
-    let failedEvent = new Event<OxenJobEvent<'a>> ()
-    let pausedEvent = new Event<OxenQueueEvent<'a>> ()
-    let resumedEvent = new Event<OxenQueueEvent<'a>> ()
-    let newJobEvent = new Event<OxenNewJobEvent> ()
-    let onNewJob = newJobEvent.Publish
 
     let processJob handler job =
         async {
@@ -562,9 +595,40 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel |> Async.Ignore
         }
 
+    // c# façade
+    interface IOxenQueue<'a> with
+        member this.Add (data) =
+            this.add(data) |> Async.StartAsTask
+               
+        member this.Add (data, options) = 
+            let opts = options |> Seq.map (fun i -> (i.Key, i.Value)) |> Seq.toList
+            this.add(data, opts) |> Async.StartAsTask
+
+        member this.Process(handler) = 
+            this.``process``(fun j -> handler.Invoke(j) |> Async.awaitPlainTask)   
+        
+        [<CLIEvent>]
+        member this.OnJobCompleted = onCompleted
+        [<CLIEvent>]
+        member this.OnJobFailed = onFailed
+        [<CLIEvent>]
+        member this.OnJobProgress = onProgress
+        [<CLIEvent>]
+        member this.OnQueuePaused = onPaused
+        [<CLIEvent>]
+        member this.OnQueueResumed = onResumed
+        [<CLIEvent>]
+        member this.OnNewJob = onNewJob
+
     /// create a new queue
     new (name, mp:ConnectionMultiplexer) =
         Queue<'a>(name, mp.GetDatabase, mp.GetSubscriber)
+
+    /// create a new queue using factory funcs in c#
+    new (name, dbFactory:Func<IDatabase>, subFactory:Func<ISubscriber>) =
+        let dbFactory () = dbFactory.Invoke()
+        let subFactory () = subFactory.Invoke()
+        Queue<'a>(name, dbFactory, subFactory, false)
 
     /// the name of the queue use this to uniquely identify the queue. (note: will be used in the redis keys like "bull:<queuename>:wait"
     member x.name = name
@@ -741,11 +805,11 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     //Events
     member x.on = {
-        Paused = pausedEvent.Publish
-        Resumed = resumedEvent.Publish
-        Completed = completedEvent.Publish
-        Progress = progressEvent.Publish
-        Failed = failedEvent.Publish
+        Paused = onPaused
+        Resumed = onResumed
+        Completed = onCompleted
+        Progress = onProgress
+        Failed = onFailed
         NewJob = onNewJob
     }
 
@@ -756,14 +820,9 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         async {
             logger.Info "emitting new queue-event %A for queue %s" eventType name
             match eventType with
-            | Paused -> pausedEvent.Trigger({ queue = this })
-            | Resumed -> resumedEvent.Trigger({ queue = this })
+            | Paused -> pausedEvent.Trigger(x, { queue = this })
+            | Resumed -> resumedEvent.Trigger(x, { queue = this })
             | _ -> failwith "Not a queue event!"
-        }
-
-    member internal x.emitNewJobEvent jobId =
-        async {
-            newJobEvent.Trigger({ jobId = jobId })
         }
 
     member internal x.emitJobEvent (eventType, job:Job<'a>, ?value, ?exn, ?data) =
@@ -777,9 +836,9 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 }
 
             match eventType with
-            | Completed -> completedEvent.Trigger(eventData)
-            | Progress -> progressEvent.Trigger(eventData)
-            | Failed -> failedEvent.Trigger(eventData)
+            | Completed -> completedEvent.Trigger(x, eventData)
+            | Progress -> progressEvent.Trigger(x, eventData)
+            | Failed -> failedEvent.Trigger(x, eventData)
             | _ -> failwith "Not a job event!"
         }
 

@@ -39,7 +39,6 @@ let taskJobHash () = Task.Factory.StartNew(fun () ->
         HashEntry(toValueStr "progress", toValueI32 1)
         HashEntry(toValueStr "delay", toValueFloat 0.)
         HashEntry(toValueStr "timestamp", toValueFloat (DateTime.Now |> toUnixTime))
-        HashEntry(toValueStr "progress", toValueI32 1)
         HashEntry(toValueStr "stacktrace", toValueStr "errrrrrr")
     |])
 
