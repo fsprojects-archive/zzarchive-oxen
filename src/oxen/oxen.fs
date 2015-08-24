@@ -462,13 +462,28 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let resumedChannel = _toKey("resumed") |> keyToChannel
     let pausedChannel = _toKey("paused") |> keyToChannel
 
+    let completedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
+    let progressEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
+    let failedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
+    let pausedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
+    let resumedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
+    let newJobEvent = new Event<OxenNewJobEventDelegate, OxenNewJobEvent> ()
+    
+    
+    let onCompleted = completedEvent.Publish
+    let onFailed = failedEvent.Publish
+    let onProgress = progressEvent.Publish
+    let onPaused = pausedEvent.Publish
+    let onResumed = resumedEvent.Publish
+    let onNewJob = newJobEvent.Publish
+
     let sub = subscriberFactory ()
     do sub.Subscribe(
                 newJobChannel,
                 (fun c v ->
                     async {
                         let jobId = v |> int64
-                        return! this.emitNewJobEvent(jobId)
+                        newJobEvent.Trigger(this, { jobId = jobId })
                     } |> Async.RunSynchronously))
 
     let rec ensureSubscription () =
@@ -502,21 +517,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     do logger.Info "subscribed to %A" newJobChannel
 
     let token = Guid.NewGuid ()
-
-    let completedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
-    let progressEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
-    let failedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
-    let pausedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
-    let resumedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
-    let newJobEvent = new Event<OxenNewJobEventDelegate, OxenNewJobEvent> ()
-    
-    
-    let onCompleted = completedEvent.Publish
-    let onFailed = failedEvent.Publish
-    let onProgress = progressEvent.Publish
-    let onPaused = pausedEvent.Publish
-    let onResumed = resumedEvent.Publish
-    let onNewJob = newJobEvent.Publish
 
     let processJob handler job =
         async {
@@ -823,11 +823,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             | Paused -> pausedEvent.Trigger(x, { queue = this })
             | Resumed -> resumedEvent.Trigger(x, { queue = this })
             | _ -> failwith "Not a queue event!"
-        }
-
-    member internal x.emitNewJobEvent jobId =
-        async {
-            newJobEvent.Trigger(x, { jobId = jobId })
         }
 
     member internal x.emitJobEvent (eventType, job:Job<'a>, ?value, ?exn, ?data) =
