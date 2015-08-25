@@ -3,6 +3,7 @@ module oxen.Tests
 open System
 open System.Diagnostics
 open System.IO
+open System.Threading
 open System.Threading.Tasks
 
 open Foq
@@ -23,6 +24,36 @@ type Order = {
 type OtherData = {
     Value: string
 }
+
+type Agent<'a> = MailboxProcessor<'a>
+
+type SemaphoreCommand =
+    |Release
+    |Wait of AsyncReplyChannel<unit>
+
+let semaphore slots =
+    Agent.Start
+    <| fun inbox ->
+        let rec loop c (w:AsyncReplyChannel<unit> list) =
+          async {
+            let! command = inbox.Receive()
+            match command with
+            | Release -> 
+                return!
+                    match c with 
+                    | _ when c >= slots -> failwith (sprintf "all slots in semaphore taken (slots: %i, taken: %i)" slots (c + 1))
+                    | _ when (c + 1) = slots ->
+                        w |> List.iter(fun t -> t.Reply()) 
+                        loop c w
+                    | _ -> loop (c + 1) w
+            | Wait a -> 
+                if (c + 1) = slots then 
+                    a.Reply()
+
+                return! loop c (a::w)
+        }
+        loop 0 []
+
 
 let taskUnit () = Task.Factory.StartNew(fun () -> ())
 let taskIncr () = Task.Factory.StartNew(fun () -> 1L)
@@ -362,20 +393,11 @@ type QueueFixture () =
         let logger = LogManager.getNamedLogger "IntegrationTests"
         let mp = ConnectionMultiplexer.Connect("127.0.0.1, allowAdmin=true")
         let q = Queue<TestControlMessage>("test-control-messages", mp.GetDatabase, mp.GetSubscriber)
-        let sendJobWithBull queue times =
-            q.add({ times = times; queueName = queue }) |> Async.RunSynchronously
-
-
-        let waitForQueueToFinish (queue:Queue<_>) =
-            let rec wait () =
-                async {
-                    let! waiting = queue.getWaiting()
-                    let! active = queue.getActive()
-                    match waiting.Length + active.Length with
-                    | x when x > 0 -> return! wait ()
-                    | _ -> ()
-                }
-            wait ()
+        let sendJobWithBull queue times = 
+            async {
+                do q.on.Completed.Add(fun j -> Debug.Print(sprintf "%i" j.job.jobId))
+                return! q.add({ times = times; queueName = queue })
+            }
 
         [<Fact>]
         let ``should call handler when a new job is added`` () =
@@ -540,22 +562,36 @@ type QueueFixture () =
         let ``should be able to fail processing a job`` () =
             // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
-            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber, true)
 
             queue.``process``(fun j ->
                 async {
                     if j.jobId % 2L = 0L then failwith "aaaargg it be even!"
                 })
 
+            use completed1Failed1 = semaphore 2
+            
+            do queue.on.Completed.Add(fun _ -> 
+                completed1Failed1.Post Release
+            )
+
+            do queue.on.Failed.Add(fun _ -> 
+                completed1Failed1.Post Release
+            )
+
             async {
                 // When
                 let! job1 = queue.add({ value = "bert1" })
                 let! job2 = queue.add({ value = "bert2" })
-
-                do! waitForQueueToFinish queue
+                
+                do! completed1Failed1.PostAndAsyncReply(fun t -> Wait t)
 
                 // Then
-                let! j1c = job1.isCompleted
+                let jobs = [job1; job2]
+                let job1 = jobs |> Seq.find(fun j -> j.jobId = 1L)
+                let job2 = jobs |> Seq.find(fun j -> j.jobId = 2L)
+
+                let! j1c = job1.isCompleted 
                 j1c |> should be True
                 let! j2c = job2.isCompleted
                 j2c |> should be False
@@ -606,16 +642,19 @@ type QueueFixture () =
                 let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queuename = (Guid.NewGuid ()).ToString()
                 let queue = new Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                use jobscompleted = semaphore 100 
+
                 queue.``process`` (fun j ->
                     async {
                         Debug.Print (j.jobId.ToString ())
                         Debug.Print "huuu"
                     })
+                
+                queue.on.Completed.Add (fun _ -> jobscompleted.Post Release)
 
                 // When
-                sendJobWithBull queuename 100 |> ignore
-                do! queue.on.NewJob |> Async.AwaitEvent |> Async.Ignore
-                do! waitForQueueToFinish queue
+                let! job = sendJobWithBull queuename 100
+                do! jobscompleted.PostAndAsyncReply(fun t -> Wait t)
 
                 //Then
                 let! length = queue.count ()
@@ -632,11 +671,15 @@ type QueueFixture () =
                 let mp2 = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queuename = (Guid.NewGuid ()).ToString()
                 let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                use jobscompleted = semaphore 100 
+
                 queue.``process`` (fun j ->
                     async {
                         Debug.Print (j.jobId.ToString ())
                         Debug.Print "huuu"
                     })
+
+                queue.on.Completed.Add(fun _ -> jobscompleted.Post Release)
 
                 let queue2 = Queue<Data>(queuename, mp2.GetDatabase, mp2.GetSubscriber)
                 queue2.``process`` (fun j ->
@@ -645,10 +688,11 @@ type QueueFixture () =
                         Debug.Print "huuu2"
                     })
 
+                queue2.on.Completed.Add(fun _ -> jobscompleted.Post Release)
+
                 // When
-                sendJobWithBull queuename 100 |> ignore
-                do! queue.on.NewJob |> Async.AwaitEvent |> Async.Ignore
-                do! waitForQueueToFinish queue
+                let! job = sendJobWithBull queuename 100
+                do! jobscompleted.PostAndAsyncReply(fun t -> Wait t)
 
                 //Then
                 let! length = queue.count ()
@@ -676,7 +720,7 @@ type QueueFixture () =
                     })
 
                 let! job = queue.add({value = "test"});
-                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
+                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore 
                 let! completed = job.isCompleted
                 completed |> should be True
                 !called |> should equal 2
@@ -688,7 +732,7 @@ type QueueFixture () =
                 let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp)
                 let called = ref false
-                let delay = 500.
+                let delay = 1000.
                 queue.``process`` (fun j -> async {
                     let curDate = DateTime.Now
                     j.timestamp.AddMilliseconds(delay) |> should lessThanOrEqualTo curDate
@@ -726,7 +770,7 @@ type QueueFixture () =
                 do queue.add({order = 7}, [("delay", "1300")]) |> ignore
                 do queue.add({order = 4}, [("delay", "700")]) |> ignore
                 do queue.add({order = 8}, [("delay", "1500")]) |> ignore
-                do! waitForQueueToFinish queue
+                do! queue.on.Empty |> Async.AwaitEvent |> Async.Ignore
             } |> Async.RunSynchronously
 
         [<Fact>]

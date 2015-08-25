@@ -65,6 +65,22 @@ module Async =
     let inline startAsPlainTask (work : Async<unit>) =
         Task.Factory.StartNew(fun () -> work |> Async.RunSynchronously)
 
+    let WithTimeout (timeout:int) operation = 
+        match timeout > 0 with
+        | true -> 
+            async { 
+                let! child = Async.StartChild (operation, timeout) 
+                try 
+                    let! result = child 
+                    return Some result
+                with :? TimeoutException -> return None 
+            }
+        | _ -> 
+            async { 
+                let! result = operation
+                return Some result
+            }
+
 /// [omit]
 type EventType =
     | Completed
@@ -73,6 +89,7 @@ type EventType =
     | Paused
     | Resumed
     | NewJob
+    | Empty
 
 /// [omit]
 type ListType =
@@ -387,6 +404,7 @@ and Events<'a> = {
     Failed: IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
     Paused: IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
     Resumed: IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    Empty: IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
     NewJob: IEvent<OxenNewJobEventDelegate, OxenNewJobEvent>
 }
 /// [omit]
@@ -433,6 +451,8 @@ and IOxenQueue<'a> =
     [<CLIEvent>]
     abstract member OnQueueResumed : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
     [<CLIEvent>]
+    abstract member OnQueueEmpty : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    [<CLIEvent>]
     abstract member OnNewJob : IEvent<OxenNewJobEventDelegate, OxenNewJobEvent>
 
 
@@ -467,6 +487,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let failedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
     let pausedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
     let resumedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
+    let emptyEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
     let newJobEvent = new Event<OxenNewJobEventDelegate, OxenNewJobEvent> ()
     
     
@@ -475,16 +496,11 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let onProgress = progressEvent.Publish
     let onPaused = pausedEvent.Publish
     let onResumed = resumedEvent.Publish
+    let onEmpty = emptyEvent.Publish
     let onNewJob = newJobEvent.Publish
 
     let sub = subscriberFactory ()
-    do sub.Subscribe(
-                newJobChannel,
-                (fun c v ->
-                    async {
-                        let jobId = v |> int64
-                        newJobEvent.Trigger(this, { jobId = jobId })
-                    } |> Async.RunSynchronously))
+    do sub.Subscribe(newJobChannel, (fun _ v -> newJobEvent.Trigger(this, { jobId = v |> int64 })))
 
     let rec ensureSubscription () =
         async {
@@ -541,7 +557,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             match gotIt with
             | g when g.HasValue -> return! this.getJob (g |> int64)
             | _ ->
-                do! onNewJob |> Async.AwaitEvent |> Async.Ignore
+                do! this.emitQueueEvent(Empty)
+                do! onNewJob |> Async.AwaitEvent |> Async.WithTimeout 1000 |> Async.Ignore
                 return! getNextJob ()
         }
 
@@ -617,6 +634,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         member this.OnQueuePaused = onPaused
         [<CLIEvent>]
         member this.OnQueueResumed = onResumed
+        [<CLIEvent>]
+        member this.OnQueueEmpty = onEmpty
         [<CLIEvent>]
         member this.OnNewJob = onNewJob
 
@@ -807,6 +826,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     member x.on = {
         Paused = onPaused
         Resumed = onResumed
+        Empty = onEmpty
         Completed = onCompleted
         Progress = onProgress
         Failed = onFailed
@@ -822,6 +842,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             match eventType with
             | Paused -> pausedEvent.Trigger(x, { queue = this })
             | Resumed -> resumedEvent.Trigger(x, { queue = this })
+            | Empty -> emptyEvent.Trigger(x, { queue = this })
             | _ -> failwith "Not a queue event!"
         }
 
