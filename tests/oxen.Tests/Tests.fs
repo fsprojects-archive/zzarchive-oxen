@@ -3,6 +3,7 @@ module oxen.Tests
 open System
 open System.Diagnostics
 open System.IO
+open System.Threading
 open System.Threading.Tasks
 
 open Foq
@@ -23,6 +24,8 @@ type Order = {
 type OtherData = {
     Value: string
 }
+
+type Lighthouse = SemaphoreSlim
 
 let taskUnit () = Task.Factory.StartNew(fun () -> ())
 let taskIncr () = Task.Factory.StartNew(fun () -> 1L)
@@ -362,20 +365,11 @@ type QueueFixture () =
         let logger = LogManager.getNamedLogger "IntegrationTests"
         let mp = ConnectionMultiplexer.Connect("127.0.0.1, allowAdmin=true")
         let q = Queue<TestControlMessage>("test-control-messages", mp.GetDatabase, mp.GetSubscriber)
-        let sendJobWithBull queue times =
-            q.add({ times = times; queueName = queue }) |> Async.RunSynchronously
-
-
-        let waitForQueueToFinish (queue:Queue<_>) =
-            let rec wait () =
-                async {
-                    let! waiting = queue.getWaiting()
-                    let! active = queue.getActive()
-                    match waiting.Length + active.Length with
-                    | x when x > 0 -> return! wait ()
-                    | _ -> ()
-                }
-            wait ()
+        let sendJobWithBull queue times = 
+            async {
+                do q.on.Completed.Add(fun j -> Debug.Print(sprintf "%i" j.job.jobId))
+                return! q.add({ times = times; queueName = queue })
+            }
 
         [<Fact>]
         let ``should call handler when a new job is added`` () =
@@ -547,14 +541,26 @@ type QueueFixture () =
                     if j.jobId % 2L = 0L then failwith "aaaargg it be even!"
                 })
 
+            use completed1Failed1 = new Lighthouse(0, 2)
+            
+            do queue.on.Completed.Add(fun _ -> 
+                completed1Failed1.Release() |> ignore
+            )
+
+            do queue.on.Failed.Add(fun _ -> 
+                completed1Failed1.Release() |> ignore
+            )
+
             async {
                 // When
                 let! job1 = queue.add({ value = "bert1" })
                 let! job2 = queue.add({ value = "bert2" })
-
-                do! waitForQueueToFinish queue
+                
+                do! completed1Failed1.WaitAsync() |> Async.awaitPlainTask
+                do! completed1Failed1.WaitAsync() |> Async.awaitPlainTask
 
                 // Then
+                //completedInTime |> should be True
                 let! j1c = job1.isCompleted
                 j1c |> should be True
                 let! j2c = job2.isCompleted
@@ -613,9 +619,9 @@ type QueueFixture () =
                     })
 
                 // When
-                sendJobWithBull queuename 100 |> ignore
+                let! job = sendJobWithBull queuename 100
                 do! queue.on.NewJob |> Async.AwaitEvent |> Async.Ignore
-                do! waitForQueueToFinish queue
+                do! queue.on.Empty |> Async.AwaitEvent |> Async.Ignore
 
                 //Then
                 let! length = queue.count ()
@@ -646,9 +652,9 @@ type QueueFixture () =
                     })
 
                 // When
-                sendJobWithBull queuename 100 |> ignore
+                let! job = sendJobWithBull queuename 100
                 do! queue.on.NewJob |> Async.AwaitEvent |> Async.Ignore
-                do! waitForQueueToFinish queue
+                do! queue.on.Empty |> Async.AwaitEvent |> Async.Ignore
 
                 //Then
                 let! length = queue.count ()
@@ -676,7 +682,7 @@ type QueueFixture () =
                     })
 
                 let! job = queue.add({value = "test"});
-                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
+                do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore 
                 let! completed = job.isCompleted
                 completed |> should be True
                 !called |> should equal 2
@@ -688,7 +694,7 @@ type QueueFixture () =
                 let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp)
                 let called = ref false
-                let delay = 500.
+                let delay = 1000.
                 queue.``process`` (fun j -> async {
                     let curDate = DateTime.Now
                     j.timestamp.AddMilliseconds(delay) |> should lessThanOrEqualTo curDate
@@ -726,7 +732,7 @@ type QueueFixture () =
                 do queue.add({order = 7}, [("delay", "1300")]) |> ignore
                 do queue.add({order = 4}, [("delay", "700")]) |> ignore
                 do queue.add({order = 8}, [("delay", "1500")]) |> ignore
-                do! waitForQueueToFinish queue
+                do! queue.on.Empty |> Async.AwaitEvent |> Async.Ignore
             } |> Async.RunSynchronously
 
         [<Fact>]
