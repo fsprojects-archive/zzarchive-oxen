@@ -838,7 +838,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     member internal x.emitQueueEvent (eventType) =
         async {
-            printfn "emitting new queue-event %A for queue %s" eventType name
             logger.Info "emitting new queue-event %A for queue %s" eventType name
             match eventType with
             | Paused -> pausedEvent.Trigger(x, { queue = this })
@@ -849,7 +848,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     member internal x.emitJobEvent (eventType, job:Job<'a>, ?value, ?exn, ?data) =
         async {
-            printfn "emitting new job-event %A for queue %s" eventType name
             let eventData =
                 {
                     job = job
