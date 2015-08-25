@@ -285,6 +285,7 @@ type Job<'a> =
             return! this.moveToSet("failed")
         }
 
+    /// move this job to the delayed set at the given timestamp
     member this.moveToDelayed timestamp =
         this.moveToSet ("delayed", timestamp)
 
@@ -374,15 +375,18 @@ type Job<'a> =
 /// i.e.: Completed, Progress, Failed
 and OxenJobEvent<'a> =
     {
+        /// the completed, failed, progressed job
         job: Job<'a>
-        data: obj option
+        /// the progress reported
         progress: int option
+        /// the exception (when a job has failed)
         err: exn option
     }
 /// a queue event
 /// i.e.: Paused, Resumed
 and OxenQueueEvent<'a> =
     {
+        /// the queue that was the source of the event.
         queue: Queue<'a>
     }
 /// [omit]
@@ -391,10 +395,13 @@ and OxenNewJobEvent =
         jobId: int64
     }
 
+/// [omit]
 and OxenJobEventDelegate<'a> = delegate of obj * OxenJobEvent<'a> -> unit
 
+/// [omit]
 and OxenQueueEventDelegate<'a> = delegate of obj * OxenQueueEvent<'a> -> unit
 
+/// [omit]
 and OxenNewJobEventDelegate = delegate of obj * OxenNewJobEvent -> unit
 
 /// [omit]
@@ -435,23 +442,35 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
     override x.Finalize () =
         x.Dispose(false)
 
+/// interface that oxen.Queue<'a> implements that gives it a more pleasant c# façade.
 and IOxenQueue<'a> =
+    /// start the queue with the given processor
     abstract member Process: (Func<Job<'a>, Task>) -> unit
+    /// add a Job
     abstract member Add: 'a -> Task<Job<'a>>
+    /// add a Job with options
     abstract member Add: 'a * Dictionary<string, string> -> Task<Job<'a>>
 
+    /// Event that fires when a Job is completed
     [<CLIEvent>]
     abstract member OnJobCompleted : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    /// Event that fires when a Job fails
     [<CLIEvent>]
     abstract member OnJobFailed : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    /// Event that fires when the progress of a job is updated.
     [<CLIEvent>]
     abstract member OnJobProgress : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    /// Event that fires when the queue is paused
     [<CLIEvent>]
     abstract member OnQueuePaused : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    /// Event that fires when the queue is resumed
     [<CLIEvent>]
     abstract member OnQueueResumed : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    /// Event that fires when the queue is empty, note this will fire often because it will 
+    /// check every second whether or not there are new jobs.
     [<CLIEvent>]
     abstract member OnQueueEmpty : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    /// Event that fires when there are new jobs on the queue.
     [<CLIEvent>]
     abstract member OnNewJob : IEvent<OxenNewJobEventDelegate, OxenNewJobEvent>
 
@@ -540,9 +559,9 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             use lr = new LockRenewer<'a>(job, token)
             try
                 logger.Info "running handler on job %i queue %s" job.jobId name
-                let! data = handler job
+                do! handler job
                 do! job.moveToCompleted () |> Async.Ignore
-                do! this.emitJobEvent(Completed, job, data = data)
+                do! this.emitJobEvent(Completed, job)
             with
                 | _ as e ->
                     logger.Error "handler failed for job %i with exn %A for queue %s" job.jobId e name
@@ -612,7 +631,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel |> Async.Ignore
         }
 
-    // c# façade
     interface IOxenQueue<'a> with
         member this.Add (data) =
             this.add(data) |> Async.StartAsTask
@@ -822,7 +840,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     /// get delayed jobs
     member x.getDelayed (start:int64, stop:int64) = this.getJobs ("delayed", List, start, stop)
 
-    //Events
+    /// events that the queue can fire
     member x.on = {
         Paused = onPaused
         Resumed = onResumed
@@ -846,14 +864,13 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             | _ -> failwith "Not a queue event!"
         }
 
-    member internal x.emitJobEvent (eventType, job:Job<'a>, ?value, ?exn, ?data) =
+    member internal x.emitJobEvent (eventType, job:Job<'a>, ?value, ?exn) =
         async {
             let eventData =
                 {
                     job = job
                     progress = value
                     err = exn
-                    data = None
                 }
 
             match eventType with

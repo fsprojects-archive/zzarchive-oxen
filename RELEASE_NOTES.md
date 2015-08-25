@@ -26,3 +26,11 @@
 #### 0.2.1 - released
 * add stacktrace to errored jobs
 * add better implementation of pause/resume
+
+#### 0.3.0 - released
+* add queue Empty event
+* start of c# façade
+* removes internal blocking calls
+* job stalledjobs before jobs on startup
+* turn off log4net by default
+* removes data returned from the handler (will return later when but wasn't implemented)
