@@ -33,3 +33,4 @@
 * removes internal blocking calls
 * job stalledjobs before jobs on startup
 * turn off log4net by default
+* removes data returned from the handler (will return later when but wasn't implemented)

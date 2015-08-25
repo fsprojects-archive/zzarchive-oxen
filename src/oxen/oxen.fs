@@ -559,9 +559,9 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             use lr = new LockRenewer<'a>(job, token)
             try
                 logger.Info "running handler on job %i queue %s" job.jobId name
-                let! data = handler job
+                do! handler job
                 do! job.moveToCompleted () |> Async.Ignore
-                do! this.emitJobEvent(Completed, job, data = data)
+                do! this.emitJobEvent(Completed, job)
             with
                 | _ as e ->
                     logger.Error "handler failed for job %i with exn %A for queue %s" job.jobId e name
