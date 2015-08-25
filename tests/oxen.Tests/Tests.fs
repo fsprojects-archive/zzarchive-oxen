@@ -25,7 +25,35 @@ type OtherData = {
     Value: string
 }
 
-type Lighthouse = SemaphoreSlim
+type Agent<'a> = MailboxProcessor<'a>
+
+type SemaphoreCommand =
+    |Release
+    |Wait of AsyncReplyChannel<unit>
+
+let semaphore slots =
+    Agent.Start
+    <| fun inbox ->
+        let rec loop c (w:AsyncReplyChannel<unit> list) =
+          async {
+            let! command = inbox.Receive()
+            match command with
+            | Release -> 
+                return!
+                    match c with 
+                    | _ when c >= slots -> failwith (sprintf "all slots in semaphore taken (slots: %i, taken: %i)" slots (c + 1))
+                    | _ when (c + 1) = slots ->
+                        w |> List.iter(fun t -> t.Reply()) 
+                        loop c w
+                    | _ -> loop (c + 1) w
+            | Wait a -> 
+                if (c + 1) = slots then 
+                    a.Reply()
+
+                return! loop c (a::w)
+        }
+        loop 0 []
+
 
 let taskUnit () = Task.Factory.StartNew(fun () -> ())
 let taskIncr () = Task.Factory.StartNew(fun () -> 1L)
@@ -534,21 +562,21 @@ type QueueFixture () =
         let ``should be able to fail processing a job`` () =
             // Given
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
-            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+            let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber, true)
 
             queue.``process``(fun j ->
                 async {
                     if j.jobId % 2L = 0L then failwith "aaaargg it be even!"
                 })
 
-            use completed1Failed1 = new Lighthouse(0, 2)
+            use completed1Failed1 = semaphore 2
             
             do queue.on.Completed.Add(fun _ -> 
-                completed1Failed1.Release() |> ignore
+                completed1Failed1.Post Release
             )
 
             do queue.on.Failed.Add(fun _ -> 
-                completed1Failed1.Release() |> ignore
+                completed1Failed1.Post Release
             )
 
             async {
@@ -556,12 +584,14 @@ type QueueFixture () =
                 let! job1 = queue.add({ value = "bert1" })
                 let! job2 = queue.add({ value = "bert2" })
                 
-                do! completed1Failed1.WaitAsync() |> Async.awaitPlainTask
-                do! completed1Failed1.WaitAsync() |> Async.awaitPlainTask
+                do! completed1Failed1.PostAndAsyncReply(fun t -> Wait t)
 
                 // Then
-                //completedInTime |> should be True
-                let! j1c = job1.isCompleted
+                let jobs = [job1; job2]
+                let job1 = jobs |> Seq.find(fun j -> j.jobId = 1L)
+                let job2 = jobs |> Seq.find(fun j -> j.jobId = 2L)
+
+                let! j1c = job1.isCompleted 
                 j1c |> should be True
                 let! j2c = job2.isCompleted
                 j2c |> should be False
@@ -612,16 +642,19 @@ type QueueFixture () =
                 let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queuename = (Guid.NewGuid ()).ToString()
                 let queue = new Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                use jobscompleted = semaphore 100 
+
                 queue.``process`` (fun j ->
                     async {
                         Debug.Print (j.jobId.ToString ())
                         Debug.Print "huuu"
                     })
+                
+                queue.on.Completed.Add (fun _ -> jobscompleted.Post Release)
 
                 // When
                 let! job = sendJobWithBull queuename 100
-                do! queue.on.NewJob |> Async.AwaitEvent |> Async.Ignore
-                do! queue.on.Empty |> Async.AwaitEvent |> Async.Ignore
+                do! jobscompleted.PostAndAsyncReply(fun t -> Wait t)
 
                 //Then
                 let! length = queue.count ()
@@ -638,11 +671,15 @@ type QueueFixture () =
                 let mp2 = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
                 let queuename = (Guid.NewGuid ()).ToString()
                 let queue = Queue<Data>(queuename, mp.GetDatabase, mp.GetSubscriber)
+                use jobscompleted = semaphore 100 
+
                 queue.``process`` (fun j ->
                     async {
                         Debug.Print (j.jobId.ToString ())
                         Debug.Print "huuu"
                     })
+
+                queue.on.Completed.Add(fun _ -> jobscompleted.Post Release)
 
                 let queue2 = Queue<Data>(queuename, mp2.GetDatabase, mp2.GetSubscriber)
                 queue2.``process`` (fun j ->
@@ -651,10 +688,11 @@ type QueueFixture () =
                         Debug.Print "huuu2"
                     })
 
+                queue2.on.Completed.Add(fun _ -> jobscompleted.Post Release)
+
                 // When
                 let! job = sendJobWithBull queuename 100
-                do! queue.on.NewJob |> Async.AwaitEvent |> Async.Ignore
-                do! queue.on.Empty |> Async.AwaitEvent |> Async.Ignore
+                do! jobscompleted.PostAndAsyncReply(fun t -> Wait t)
 
                 //Then
                 let! length = queue.count ()

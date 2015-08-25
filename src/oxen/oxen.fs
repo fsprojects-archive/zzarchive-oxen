@@ -500,13 +500,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let onNewJob = newJobEvent.Publish
 
     let sub = subscriberFactory ()
-    do sub.Subscribe(
-                newJobChannel,
-                (fun c v ->
-                    async {
-                        let jobId = v |> int64
-                        newJobEvent.Trigger(this, { jobId = jobId })
-                    } |> Async.RunSynchronously))
+    do sub.Subscribe(newJobChannel, (fun _ v -> newJobEvent.Trigger(this, { jobId = v |> int64 })))
 
     let rec ensureSubscription () =
         async {
