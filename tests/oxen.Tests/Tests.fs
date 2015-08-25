@@ -2,8 +2,6 @@ module oxen.Tests
 
 open System
 open System.Diagnostics
-open System.IO
-open System.Threading
 open System.Threading.Tasks
 
 open Foq
@@ -62,6 +60,7 @@ let taskLong () = Task.Factory.StartNew(fun () -> 1L)
 let taskTrue () = Task.Factory.StartNew(fun () -> true)
 let taskFalse () = Task.Factory.StartNew(fun () -> false)
 let taskRedisResult () = Task.Factory.StartNew(fun () -> Mock<RedisResult>().Create());
+
 /// change default hash set order to check independence of field order
 let taskJobHash () = Task.Factory.StartNew(fun () ->
     [|
@@ -390,7 +389,6 @@ type QueueFixture () =
         }
 
     type IntegrationTests () =
-        let logger = LogManager.getNamedLogger "IntegrationTests"
         let mp = ConnectionMultiplexer.Connect("127.0.0.1, allowAdmin=true")
         let q = Queue<TestControlMessage>("test-control-messages", mp.GetDatabase, mp.GetSubscriber)
         let sendJobWithBull queue times = 
@@ -405,7 +403,7 @@ type QueueFixture () =
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
             let queue = Queue<Data>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
             let newJob = ref false
-            do queue.``process`` (fun j -> async { newJob := true })
+            do queue.``process`` (fun _ -> async { newJob := true })
 
             async {
                 // When
@@ -426,7 +424,7 @@ type QueueFixture () =
             let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
             let queue = Queue<OtherData>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
             let newJob = ref false
-            do queue.``process`` (fun j -> async { newJob := true })
+            do queue.``process`` (fun _ -> async { newJob := true })
 
             async {
                 // When
@@ -453,10 +451,10 @@ type QueueFixture () =
 
             async {
                 // When
-                let! job = queue.add({value = "test"});
+                do! queue.add({value = "test"}) |> Async.Ignore
                 do! queue.moveJob(queue.toKey("wait"), queue.toKey("active")) |> Async.Ignore
                 let stalledJob = ref false
-                queue.``process``(fun j -> async {
+                queue.``process``(fun _ -> async {
                     stalledJob := true
                 })
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
@@ -653,7 +651,7 @@ type QueueFixture () =
                 queue.on.Completed.Add (fun _ -> jobscompleted.Post Release)
 
                 // When
-                let! job = sendJobWithBull queuename 100
+                do! sendJobWithBull queuename 100 |> Async.Ignore
                 do! jobscompleted.PostAndAsyncReply(fun t -> Wait t)
 
                 //Then
@@ -691,7 +689,7 @@ type QueueFixture () =
                 queue2.on.Completed.Add(fun _ -> jobscompleted.Post Release)
 
                 // When
-                let! job = sendJobWithBull queuename 100
+                do! sendJobWithBull queuename 100 |> Async.Ignore
                 do! jobscompleted.PostAndAsyncReply(fun t -> Wait t)
 
                 //Then
@@ -738,7 +736,7 @@ type QueueFixture () =
                     j.timestamp.AddMilliseconds(delay) |> should lessThanOrEqualTo curDate
                     called := true
                 })
-                let! job = queue.add({ value = "test"}, [("delay", delay |> string)])
+                do! queue.add({ value = "test"}, [("delay", delay |> string)]) |> Async.Ignore
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
                 let! delayed = queue.getDelayed ()
                 delayed.Length |> should equal 0
@@ -782,8 +780,8 @@ type QueueFixture () =
             let pauseHappend = ref false
             let resumeHappend = ref false
 
-            queue.on.Resumed.Add(fun q -> resumeHappend := true)
-            queue.on.Paused.Add(fun q -> pauseHappend := true)
+            queue.on.Resumed.Add(fun _ -> resumeHappend := true)
+            queue.on.Paused.Add(fun _ -> pauseHappend := true)
 
             // When
             queue.pause () |> Async.RunSynchronously
