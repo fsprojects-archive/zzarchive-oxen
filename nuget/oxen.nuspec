@@ -5,7 +5,7 @@
     <version>@build.number@</version>
     <authors>@authors@</authors>
     <owners>@authors@</owners>
-    <licenseUrl>http://github.com/fsprojects/oxen/blob/master/LICENSE.txt</licenseUrl>
+    <licenseUrl>http://github.com/fsprojects/oxen/blob/master/LICENSE</licenseUrl>
     <projectUrl>http://fsprojects.github.io/oxen</projectUrl>
     <iconUrl>https://raw.githubusercontent.com/fsprojects/oxen/master/docs/files/img/logo.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
