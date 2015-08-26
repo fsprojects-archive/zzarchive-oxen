@@ -254,8 +254,8 @@ type Job<'a> =
             let dest = queue.toKey(set)
             match timestamp with
             | None ->
-                do multi.ListRemoveAsync (activeList, toValueI64 this.jobId) |> ignore
-                do multi.SetAddAsync (dest, toValueI64 this.jobId) |> ignore
+                multi.ListRemoveAsync (activeList, toValueI64 this.jobId) |> ignore
+                multi.SetAddAsync (dest, toValueI64 this.jobId) |> ignore
             | Some t ->
                 let score = if t < 0. then 0. else t;
                 multi.SortedSetAddAsync(dest, toValueI64 this.jobId, score) |> ignore
@@ -270,6 +270,12 @@ type Job<'a> =
             let client:IDatabase = this.queue.client()
             return! client.SetContainsAsync(this.queue.toKey(list), toValueI64 this.jobId) |> Async.AwaitTask
         }
+
+    /// see if the job is completed.
+    member this.isCompleted = this.isDone("completed")
+
+    /// see if job failed
+    member this.isFailed = this.isDone("failed")
 
     /// move this job to the completed list.
     member this.moveToCompleted () = this.moveToSet("completed")
@@ -288,12 +294,6 @@ type Job<'a> =
     /// move this job to the delayed set at the given timestamp
     member this.moveToDelayed timestamp =
         this.moveToSet ("delayed", timestamp)
-
-    /// see if the job is completed.
-    member this.isCompleted = this.isDone("completed")
-
-    /// see if job failed
-    member this.isFailed = this.isDone("failed")
 
     /// create a new job (note: The job will be stored in redis but it won't be added to the waiting list. You should probably use `Queue.add`)
     static member create (queue, jobId, data:'a, opts) =
@@ -560,7 +560,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             try
                 logger.Info "running handler on job %i queue %s" job.jobId name
                 do! handler job
-                do! job.moveToCompleted () |> Async.Ignore
+                let! result = job.moveToCompleted ()
+                assert result
                 do! this.emitJobEvent(Completed, job)
             with
                 | _ as e ->
