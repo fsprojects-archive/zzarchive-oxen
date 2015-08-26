@@ -26,10 +26,13 @@ type OtherData = {
 
 type Agent<'a> = MailboxProcessor<'a>
 
+
+/// Commands the semaphore can receive
 type SemaphoreCommand =
     |Release
     |Wait of AsyncReplyChannel<unit>
 
+/// A constructor function that creates a semaphore
 let semaphore slots =
     Agent.Start
     <| fun inbox ->
@@ -41,13 +44,15 @@ let semaphore slots =
                 let slotsTaken = c + 1
                 return!
                     match slotsTaken with 
-                    | _ when slotsTaken = slots ->
+                    | _ when slotsTaken >= slots ->
+                        // all slots taken reply that we're done
                         w |> List.iter(fun t -> t.Reply()) 
                         loop slotsTaken w
                     | _ -> 
                         loop slotsTaken w
             | Wait a -> 
-                if c = slots then 
+                if c >= slots then 
+                    // all slots allready taken reply immediately
                     a.Reply()
 
                 return! loop c (a::w)
