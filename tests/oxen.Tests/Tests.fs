@@ -2,6 +2,7 @@ module oxen.Tests
 
 open System
 open System.Diagnostics
+open System.Threading
 open System.Threading.Tasks
 
 open Foq
@@ -25,10 +26,13 @@ type OtherData = {
 
 type Agent<'a> = MailboxProcessor<'a>
 
+
+/// Commands the semaphore can receive
 type SemaphoreCommand =
     |Release
     |Wait of AsyncReplyChannel<unit>
 
+/// A constructor function that creates a semaphore
 let semaphore slots =
     Agent.Start
     <| fun inbox ->
@@ -37,15 +41,18 @@ let semaphore slots =
             let! command = inbox.Receive()
             match command with
             | Release -> 
+                let slotsTaken = c + 1
                 return!
-                    match c with 
-                    | _ when c >= slots -> failwith (sprintf "all slots in semaphore taken (slots: %i, taken: %i)" slots (c + 1))
-                    | _ when (c + 1) = slots ->
+                    match slotsTaken with 
+                    | _ when slotsTaken >= slots ->
+                        // all slots taken reply that we're done
                         w |> List.iter(fun t -> t.Reply()) 
-                        loop c w
-                    | _ -> loop (c + 1) w
+                        loop slotsTaken w
+                    | _ -> 
+                        loop slotsTaken w
             | Wait a -> 
-                if (c + 1) = slots then 
+                if c >= slots then 
+                    // all slots allready taken reply immediately
                     a.Reply()
 
                 return! loop c (a::w)
@@ -75,6 +82,53 @@ let taskJobHash () = Task.Factory.StartNew(fun () ->
 let taskValues (value:int64) = Task.Factory.StartNew(fun () -> [| RedisValue.op_Implicit(value) |])
 let taskEmptyValues () = Task.Factory.StartNew(fun () -> [| |])
 let taskEmptyValue () = Task.Factory.StartNew(fun () -> new RedisValue())
+
+type SemaphoreFixture () =
+    [<Fact>]
+    let ``should wait for all slots to be taken`` () =
+        // Given
+        use traficLight = semaphore 5
+        let green = traficLight.PostAndAsyncReply (fun t -> Wait t) |> Async.StartAsTask
+
+        // When 
+        traficLight.Post Release
+        traficLight.Post Release
+        traficLight.Post Release
+        traficLight.Post Release
+
+        // Then
+        green.IsCompleted |> should be False
+        traficLight.Post Release
+        green.Result |> should equal None
+        green.IsCompleted |> should be True
+
+    [<Fact>]
+    let ``should wait for all slots to be taken even if there's just one`` () =
+        // Given
+        use traficLight = semaphore 1
+        let green = traficLight.PostAndAsyncReply (fun t -> Wait t) |> Async.StartAsTask
+
+        // When 
+        Thread.Sleep(100)
+        green.IsCompleted |> should be False
+        traficLight.Post Release
+        
+        // Then
+        green.Result
+        green.IsCompleted |> should be True
+
+    [<Fact>]
+    let ``should wait for all slots to be taken even if there are none`` () =
+        // Given
+        use traficLight = semaphore 0
+        let green = traficLight.PostAndAsyncReply (fun t -> Wait t) |> Async.StartAsTask
+
+        // When 
+        // nothing happens
+                
+        // Then
+        green.Result
+        green.IsCompleted |> should be True
 
 type JobFixture () =
     [<Fact>]
@@ -389,7 +443,8 @@ type QueueFixture () =
         }
 
     type IntegrationTests () =
-        let mp = ConnectionMultiplexer.Connect("127.0.0.1, allowAdmin=true")
+        static let mp = ConnectionMultiplexer.Connect("127.0.0.1, allowAdmin=true")
+        static do mp.GetServer(mp.GetEndPoints().[0]).FlushDatabase()
         let q = Queue<TestControlMessage>("test-control-messages", mp.GetDatabase, mp.GetSubscriber)
         let sendJobWithBull queue times = 
             async {
@@ -569,12 +624,14 @@ type QueueFixture () =
 
             use completed1Failed1 = semaphore 2
             
-            do queue.on.Completed.Add(fun _ -> 
+            do queue.on.Completed.Add(fun j -> 
                 completed1Failed1.Post Release
+                j.job.isCompleted |> Async.RunSynchronously |> should be True
             )
 
-            do queue.on.Failed.Add(fun _ -> 
+            do queue.on.Failed.Add(fun j -> 
                 completed1Failed1.Post Release
+                j.job.isFailed |> Async.RunSynchronously |> should be True
             )
 
             async {
@@ -586,14 +643,14 @@ type QueueFixture () =
 
                 // Then
                 let jobs = [job1; job2]
-                let job1 = jobs |> Seq.find(fun j -> j.jobId = 1L)
-                let job2 = jobs |> Seq.find(fun j -> j.jobId = 2L)
+                let job11 = jobs |> Seq.find(fun j -> j.jobId = 1L)
+                let job22 = jobs |> Seq.find(fun j -> j.jobId = 2L)
 
-                let! j1c = job1.isCompleted 
+                let! j1c = job11.isCompleted 
                 j1c |> should be True
-                let! j2c = job2.isCompleted
+                let! j2c = job22.isCompleted
                 j2c |> should be False
-                let! j2f = job2.isFailed
+                let! j2f = job22.isFailed
                 j2f |> should be True
             } |> Async.RunSynchronously
 
