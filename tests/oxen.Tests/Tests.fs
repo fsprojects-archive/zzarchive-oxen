@@ -871,6 +871,26 @@ type QueueFixture () =
                 awaitedJob.data.value |> should equal "4"
                 awaitedJob.jobId |> should equal 4L
             } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should be to start waiting before the predicate is available`` () =
+            async {
+                // Given
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queue = Queue<Data>(string (Guid.NewGuid ()), mp.GetDatabase, mp.GetSubscriber)
+
+                queue.``process``(fun j -> async {()})
+                let awaiter = queue.jobAwaiter Completed
+
+                // When
+                let! job = queue.add({ value = "1" })
+                let awaiter = awaiter (fun j -> j.jobId = job.jobId) 10000
+                
+                // Then
+                let! awaitedJob = awaiter
+                awaitedJob.data.value |> should equal "1"
+                awaitedJob.jobId |> should equal 1L
+            } |> Async.RunSynchronously
             
         [<Fact>]
         let ``it should be possible to ensure delivery of a job to more than one listener`` () = ()
