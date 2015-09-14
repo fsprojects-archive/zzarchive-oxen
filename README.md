@@ -59,5 +59,6 @@ On windows:
 
 - Albert-Jan Nijburg [@albertjan](https://github.com/albertjan)
 - Remko Boschker [@remkoboschker](https://github.com/remkoboschker)
+- Eltjo Kraai [@eltjo-k](https://github.com/eltjo-k)
 
 The default maintainer account for projects under "fsprojects" is [@fsprojectsgit](https://github.com/fsprojectsgit) - F# Community Project Incubation Space (repo management)
