@@ -59,7 +59,7 @@ module Async =
         let continuation (t : Task) : unit =
             match t.IsFaulted with
             | true -> raise t.Exception
-            | arg -> ()
+            | _ -> ()
         task.ContinueWith continuation |> Async.AwaitTask
 
     let inline startAsPlainTask (work : Async<unit>) =
@@ -414,6 +414,10 @@ and Events<'a> = {
     Empty: IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
     NewJob: IEvent<OxenNewJobEventDelegate, OxenNewJobEvent>
 }
+and EventAwaiterMessage<'a> =
+    | Event of OxenJobEvent<'a>
+    | WaitFor of (Job<'a> -> bool) * AsyncReplyChannel<Job<'a>>
+
 /// [omit]
 and LockRenewer<'a> (job:Job<'a>, token:Guid) =
     static let logger = LogManager.getLogger()
@@ -541,7 +545,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                     } |> Async.RunSynchronously))
 
     do sub.Subscribe(_toKey("paused") |> keyToChannel,
-        (fun c v ->
+        (fun _ v ->
             do
                 match v |> string with
                 | "paused" -> this.emitQueueEvent(Paused) |> Async.RunSynchronously
@@ -556,7 +560,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let processJob handler job =
         async {
             processing <- true
-            use lr = new LockRenewer<'a>(job, token)
+            use _ = new LockRenewer<'a>(job, token)
             try
                 logger.Info "running handler on job %i queue %s" job.jobId name
                 do! handler job
@@ -631,6 +635,37 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
             return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel |> Async.Ignore
         }
+
+    let awaitJobAgent (inbox: MailboxProcessor<EventAwaiterMessage<'a>>) = 
+        /// look in a list if there's a job that for which the predicate returns true
+        /// and return an option on that job
+        let tryFindJob channel jobs = 
+            match channel with 
+            | None -> None
+            | Some (predicate, _) -> jobs |> List.tryFind(predicate)
+
+        let rec mainloop list (channel: ((Job<'a> -> bool) * AsyncReplyChannel<Job<'a>>) option) = 
+            async {
+                let! message = inbox.Receive()
+
+                match message with
+                | Event completed -> 
+                    let newList = completed.job::list
+                    match tryFindJob channel newList with
+                    | None -> return! mainloop newList channel
+                    | Some job -> 
+                        let _, reply = channel.Value
+                        reply.Reply job
+
+                | WaitFor (jobId, channel) ->
+                    let channelOption = Some (jobId, channel)
+                    match tryFindJob channelOption list with
+                    | None -> return! mainloop list channelOption
+                    | Some job -> channel.Reply job
+            }
+                    
+        mainloop [] None
+     
 
     interface IOxenQueue<'a> with
         member this.Add (data) =
@@ -851,6 +886,22 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         Failed = onFailed
         NewJob = onNewJob
     }
+
+    /// <summary>wait for a specfic job event to happen, the idea is that you start the awaiter before the event
+    /// will happen. So it can collect all events and return when the predicate returns true</summary>
+    /// <param name="evenType">The type of event you want to wait for (Completed, Failed, Progress)</param>
+    /// <param name="predicate">A predicate that takes a job</param>
+    /// <param name="timeout">The amount of time you want to wait before it fails</param>
+    /// <returns>an Async of job that resolves when the job is found</returns>
+    member x.jobAwaiter eventType predicate timeout =
+        let agent = MailboxProcessor<EventAwaiterMessage<'a>>.Start(awaitJobAgent)
+        match eventType with 
+            | Completed -> this.on.Completed.Add(fun e -> agent.Post (Event e))
+            | Failed -> this.on.Failed.Add(fun e -> agent.Post(Event e))
+            | Progress -> this.on.Progress.Add(fun e -> agent.Post(Event e))
+            | _ -> failwith "Not a job event!"
+        
+        agent.PostAndAsyncReply  ((fun channel -> WaitFor (predicate, channel)), timeout)
 
     //Internals
     member internal x.toKey kind = _toKey kind
