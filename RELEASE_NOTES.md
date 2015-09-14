@@ -38,6 +38,6 @@
 #### 0.4.0 - released
 * adds `jobAwaiter` function to allow you to wait for a specific event to happen
 
-#### 0.4.0 - not released
+#### 0.4.1 - released
 * changes `jobAwaiter` so you can start waiting for jobs before you know what
   the predicate will look like.
