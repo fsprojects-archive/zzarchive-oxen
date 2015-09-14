@@ -53,16 +53,16 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '13', 13)" onmouseover="showTip(event, '13', 13)">
+          <code onmouseout="hideTip(event, '15', 15)" onmouseover="showTip(event, '15', 15)">
             Add(arg1, arg2)
           </code>
-          <div class="tip" id="13">
+          <div class="tip" id="15">
             <strong>Signature:</strong> (&#39;a * Dictionary&lt;string,string&gt;) -&gt; Task&lt;Job&lt;&#39;a&gt;&gt;<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L452-452" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L456-456" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -75,16 +75,16 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '14', 14)" onmouseover="showTip(event, '14', 14)">
+          <code onmouseout="hideTip(event, '16', 16)" onmouseover="showTip(event, '16', 16)">
             Add(arg1)
           </code>
-          <div class="tip" id="14">
+          <div class="tip" id="16">
             <strong>Signature:</strong> &#39;a -&gt; Task&lt;Job&lt;&#39;a&gt;&gt;<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L450-450" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L454-454" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -97,52 +97,8 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '15', 15)" onmouseover="showTip(event, '15', 15)">
-            add_OnJobCompleted(arg1)
-          </code>
-          <div class="tip" id="15">
-            <strong>Signature:</strong> OxenJobEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
-              <strong>Modifiers:</strong> abstract<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L456-456" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Event that fires when a Job is completed</p>
-
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '16', 16)" onmouseover="showTip(event, '16', 16)">
-            add_OnJobFailed(arg1)
-          </code>
-          <div class="tip" id="16">
-            <strong>Signature:</strong> OxenJobEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
-              <strong>Modifiers:</strong> abstract<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L459-459" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Event that fires when a Job fails</p>
-
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
           <code onmouseout="hideTip(event, '17', 17)" onmouseover="showTip(event, '17', 17)">
-            add_OnJobProgress(arg1)
+            add_OnJobCompleted(arg1)
           </code>
           <div class="tip" id="17">
             <strong>Signature:</strong> OxenJobEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
@@ -150,11 +106,11 @@
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L462-462" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L460-460" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Event that fires when the progress of a job is updated.</p>
+          <p>Event that fires when a Job is completed</p>
 
 
 
@@ -164,126 +120,15 @@
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '18', 18)" onmouseover="showTip(event, '18', 18)">
-            add_OnNewJob(arg1)
+            add_OnJobFailed(arg1)
           </code>
           <div class="tip" id="18">
-            <strong>Signature:</strong> OxenNewJobEventDelegate -&gt; unit<br />
+            <strong>Signature:</strong> OxenJobEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L475-475" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Event that fires when there are new jobs on the queue.</p>
-
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '19', 19)" onmouseover="showTip(event, '19', 19)">
-            add_OnQueueEmpty(arg1)
-          </code>
-          <div class="tip" id="19">
-            <strong>Signature:</strong> OxenQueueEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
-              <strong>Modifiers:</strong> abstract<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L472-472" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Event that fires when the queue is empty, note this will fire often because it will 
-check every second whether or not there are new jobs.</p>
-
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '20', 20)" onmouseover="showTip(event, '20', 20)">
-            add_OnQueuePaused(arg1)
-          </code>
-          <div class="tip" id="20">
-            <strong>Signature:</strong> OxenQueueEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
-              <strong>Modifiers:</strong> abstract<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L465-465" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Event that fires when the queue is paused</p>
-
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '21', 21)" onmouseover="showTip(event, '21', 21)">
-            add_OnQueueResumed(arg1)
-          </code>
-          <div class="tip" id="21">
-            <strong>Signature:</strong> OxenQueueEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
-              <strong>Modifiers:</strong> abstract<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L468-468" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Event that fires when the queue is resumed</p>
-
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '22', 22)" onmouseover="showTip(event, '22', 22)">
-            OnJobCompleted
-          </code>
-          <div class="tip" id="22">
-            <strong>Signature:</strong> IEvent&lt;OxenJobEventDelegate&lt;&#39;a&gt;,OxenJobEvent&lt;&#39;a&gt;&gt;<br />
-              <strong>Modifiers:</strong> abstract<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L456-456" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Event that fires when a Job is completed</p>
-
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '23', 23)" onmouseover="showTip(event, '23', 23)">
-            OnJobFailed
-          </code>
-          <div class="tip" id="23">
-            <strong>Signature:</strong> IEvent&lt;OxenJobEventDelegate&lt;&#39;a&gt;,OxenJobEvent&lt;&#39;a&gt;&gt;<br />
-              <strong>Modifiers:</strong> abstract<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L459-459" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L463-463" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -296,16 +141,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '24', 24)" onmouseover="showTip(event, '24', 24)">
-            OnJobProgress
+          <code onmouseout="hideTip(event, '19', 19)" onmouseover="showTip(event, '19', 19)">
+            add_OnJobProgress(arg1)
           </code>
-          <div class="tip" id="24">
-            <strong>Signature:</strong> IEvent&lt;OxenJobEventDelegate&lt;&#39;a&gt;,OxenJobEvent&lt;&#39;a&gt;&gt;<br />
+          <div class="tip" id="19">
+            <strong>Signature:</strong> OxenJobEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L462-462" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L466-466" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -318,16 +163,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '25', 25)" onmouseover="showTip(event, '25', 25)">
-            OnNewJob
+          <code onmouseout="hideTip(event, '20', 20)" onmouseover="showTip(event, '20', 20)">
+            add_OnNewJob(arg1)
           </code>
-          <div class="tip" id="25">
-            <strong>Signature:</strong> IEvent&lt;OxenNewJobEventDelegate,OxenNewJobEvent&gt;<br />
+          <div class="tip" id="20">
+            <strong>Signature:</strong> OxenNewJobEventDelegate -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L475-475" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L479-479" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -340,16 +185,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '26', 26)" onmouseover="showTip(event, '26', 26)">
-            OnQueueEmpty
+          <code onmouseout="hideTip(event, '21', 21)" onmouseover="showTip(event, '21', 21)">
+            add_OnQueueEmpty(arg1)
           </code>
-          <div class="tip" id="26">
-            <strong>Signature:</strong> IEvent&lt;OxenQueueEventDelegate&lt;&#39;a&gt;,OxenQueueEvent&lt;&#39;a&gt;&gt;<br />
+          <div class="tip" id="21">
+            <strong>Signature:</strong> OxenQueueEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L472-472" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L476-476" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -363,16 +208,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '27', 27)" onmouseover="showTip(event, '27', 27)">
-            OnQueuePaused
+          <code onmouseout="hideTip(event, '22', 22)" onmouseover="showTip(event, '22', 22)">
+            add_OnQueuePaused(arg1)
           </code>
-          <div class="tip" id="27">
-            <strong>Signature:</strong> IEvent&lt;OxenQueueEventDelegate&lt;&#39;a&gt;,OxenQueueEvent&lt;&#39;a&gt;&gt;<br />
+          <div class="tip" id="22">
+            <strong>Signature:</strong> OxenQueueEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L465-465" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L469-469" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -385,16 +230,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '28', 28)" onmouseover="showTip(event, '28', 28)">
-            OnQueueResumed
+          <code onmouseout="hideTip(event, '23', 23)" onmouseover="showTip(event, '23', 23)">
+            add_OnQueueResumed(arg1)
           </code>
-          <div class="tip" id="28">
-            <strong>Signature:</strong> IEvent&lt;OxenQueueEventDelegate&lt;&#39;a&gt;,OxenQueueEvent&lt;&#39;a&gt;&gt;<br />
+          <div class="tip" id="23">
+            <strong>Signature:</strong> OxenQueueEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L468-468" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L472-472" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -407,16 +252,171 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
+          <code onmouseout="hideTip(event, '24', 24)" onmouseover="showTip(event, '24', 24)">
+            OnJobCompleted
+          </code>
+          <div class="tip" id="24">
+            <strong>Signature:</strong> IEvent&lt;OxenJobEventDelegate&lt;&#39;a&gt;,OxenJobEvent&lt;&#39;a&gt;&gt;<br />
+              <strong>Modifiers:</strong> abstract<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L460-460" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Event that fires when a Job is completed</p>
+
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '25', 25)" onmouseover="showTip(event, '25', 25)">
+            OnJobFailed
+          </code>
+          <div class="tip" id="25">
+            <strong>Signature:</strong> IEvent&lt;OxenJobEventDelegate&lt;&#39;a&gt;,OxenJobEvent&lt;&#39;a&gt;&gt;<br />
+              <strong>Modifiers:</strong> abstract<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L463-463" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Event that fires when a Job fails</p>
+
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '26', 26)" onmouseover="showTip(event, '26', 26)">
+            OnJobProgress
+          </code>
+          <div class="tip" id="26">
+            <strong>Signature:</strong> IEvent&lt;OxenJobEventDelegate&lt;&#39;a&gt;,OxenJobEvent&lt;&#39;a&gt;&gt;<br />
+              <strong>Modifiers:</strong> abstract<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L466-466" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Event that fires when the progress of a job is updated.</p>
+
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '27', 27)" onmouseover="showTip(event, '27', 27)">
+            OnNewJob
+          </code>
+          <div class="tip" id="27">
+            <strong>Signature:</strong> IEvent&lt;OxenNewJobEventDelegate,OxenNewJobEvent&gt;<br />
+              <strong>Modifiers:</strong> abstract<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L479-479" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Event that fires when there are new jobs on the queue.</p>
+
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '28', 28)" onmouseover="showTip(event, '28', 28)">
+            OnQueueEmpty
+          </code>
+          <div class="tip" id="28">
+            <strong>Signature:</strong> IEvent&lt;OxenQueueEventDelegate&lt;&#39;a&gt;,OxenQueueEvent&lt;&#39;a&gt;&gt;<br />
+              <strong>Modifiers:</strong> abstract<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L476-476" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Event that fires when the queue is empty, note this will fire often because it will 
+check every second whether or not there are new jobs.</p>
+
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
           <code onmouseout="hideTip(event, '29', 29)" onmouseover="showTip(event, '29', 29)">
-            Process(arg1)
+            OnQueuePaused
           </code>
           <div class="tip" id="29">
+            <strong>Signature:</strong> IEvent&lt;OxenQueueEventDelegate&lt;&#39;a&gt;,OxenQueueEvent&lt;&#39;a&gt;&gt;<br />
+              <strong>Modifiers:</strong> abstract<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L469-469" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Event that fires when the queue is paused</p>
+
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '30', 30)" onmouseover="showTip(event, '30', 30)">
+            OnQueueResumed
+          </code>
+          <div class="tip" id="30">
+            <strong>Signature:</strong> IEvent&lt;OxenQueueEventDelegate&lt;&#39;a&gt;,OxenQueueEvent&lt;&#39;a&gt;&gt;<br />
+              <strong>Modifiers:</strong> abstract<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L472-472" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Event that fires when the queue is resumed</p>
+
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '31', 31)" onmouseover="showTip(event, '31', 31)">
+            Process(arg1)
+          </code>
+          <div class="tip" id="31">
             <strong>Signature:</strong> Func&lt;Job&lt;&#39;a&gt;,Task&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L448-448" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L452-452" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -429,16 +429,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '30', 30)" onmouseover="showTip(event, '30', 30)">
+          <code onmouseout="hideTip(event, '32', 32)" onmouseover="showTip(event, '32', 32)">
             remove_OnJobCompleted(arg1)
           </code>
-          <div class="tip" id="30">
+          <div class="tip" id="32">
             <strong>Signature:</strong> OxenJobEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L456-456" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L460-460" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -451,16 +451,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '31', 31)" onmouseover="showTip(event, '31', 31)">
+          <code onmouseout="hideTip(event, '33', 33)" onmouseover="showTip(event, '33', 33)">
             remove_OnJobFailed(arg1)
           </code>
-          <div class="tip" id="31">
+          <div class="tip" id="33">
             <strong>Signature:</strong> OxenJobEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L459-459" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L463-463" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -473,16 +473,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '32', 32)" onmouseover="showTip(event, '32', 32)">
+          <code onmouseout="hideTip(event, '34', 34)" onmouseover="showTip(event, '34', 34)">
             remove_OnJobProgress(arg1)
           </code>
-          <div class="tip" id="32">
+          <div class="tip" id="34">
             <strong>Signature:</strong> OxenJobEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L462-462" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L466-466" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -495,16 +495,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '33', 33)" onmouseover="showTip(event, '33', 33)">
+          <code onmouseout="hideTip(event, '35', 35)" onmouseover="showTip(event, '35', 35)">
             remove_OnNewJob(arg1)
           </code>
-          <div class="tip" id="33">
+          <div class="tip" id="35">
             <strong>Signature:</strong> OxenNewJobEventDelegate -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L475-475" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L479-479" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -517,16 +517,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '34', 34)" onmouseover="showTip(event, '34', 34)">
+          <code onmouseout="hideTip(event, '36', 36)" onmouseover="showTip(event, '36', 36)">
             remove_OnQueueEmpty(arg1)
           </code>
-          <div class="tip" id="34">
+          <div class="tip" id="36">
             <strong>Signature:</strong> OxenQueueEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L472-472" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L476-476" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -540,16 +540,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '35', 35)" onmouseover="showTip(event, '35', 35)">
+          <code onmouseout="hideTip(event, '37', 37)" onmouseover="showTip(event, '37', 37)">
             remove_OnQueuePaused(arg1)
           </code>
-          <div class="tip" id="35">
+          <div class="tip" id="37">
             <strong>Signature:</strong> OxenQueueEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L465-465" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L469-469" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -562,16 +562,16 @@ check every second whether or not there are new jobs.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '36', 36)" onmouseover="showTip(event, '36', 36)">
+          <code onmouseout="hideTip(event, '38', 38)" onmouseover="showTip(event, '38', 38)">
             remove_OnQueueResumed(arg1)
           </code>
-          <div class="tip" id="36">
+          <div class="tip" id="38">
             <strong>Signature:</strong> OxenQueueEventDelegate&lt;&#39;a&gt; -&gt; unit<br />
               <strong>Modifiers:</strong> abstract<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L468-468" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L472-472" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>

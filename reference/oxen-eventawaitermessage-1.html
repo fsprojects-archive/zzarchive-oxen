@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8"/>
-    <title>OxenQueueEvent<'a> - oxen</title>
+    <title>EventAwaiterMessage<'a> - oxen</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <meta name="description" content=""/>
     <meta name="author" content="Curit"/>
@@ -35,41 +35,52 @@
 
 
 
-<h1>OxenQueueEvent<'a></h1>
+<h1>EventAwaiterMessage<'a></h1>
 <p>
   <span>Namespace: oxen</span><br />
 </p>
 <div class="xmldoc">
-<p>a queue event
-i.e.: Paused, Resumed</p>
-
-
 </div>
-  <h3>Record Fields</h3>
+  <h3>Union Cases</h3>
   <table class="table table-bordered member-list">
     <thead>
-      <tr><td>Record Field</td><td>Description</td></tr>
+      <tr><td>Union Case</td><td>Description</td></tr>
     </thead>
     <tbody>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '66', 66)" onmouseover="showTip(event, '66', 66)">
-            queue
+          <code onmouseout="hideTip(event, '13', 13)" onmouseover="showTip(event, '13', 13)">
+            Event(OxenJobEvent&lt;&#39;a&gt;)
           </code>
-          <div class="tip" id="66">
-            <strong>Signature:</strong> Queue&lt;&#39;a&gt;<br />
+          <div class="tip" id="13">
+            <strong>Signature:</strong> OxenJobEvent&lt;&#39;a&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L390-390" class="github-link">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L418-418" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>the queue that was the source of the event.</p>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
 
-
-
+          <code onmouseout="hideTip(event, '14', 14)" onmouseover="showTip(event, '14', 14)">
+            WaitFor(...)
+          </code>
+          <div class="tip" id="14">
+            <strong>Signature:</strong> Job&lt;&#39;a&gt; -&gt; bool * AsyncReplyChannel&lt;Job&lt;&#39;a&gt;&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/fsprojects/oxen/tree/master/src/oxen/oxen.fs#L419-419" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
         </td>
       </tr>
     </tbody>
