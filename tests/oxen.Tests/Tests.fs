@@ -851,6 +851,28 @@ type QueueFixture () =
             !pauseHappend |> should be True
 
         [<Fact>]
+        let ``should be able to wait for a specific event to happen`` () =
+            async {
+                // Given
+                let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+                let queue = Queue<Data>(string (Guid.NewGuid ()), mp.GetDatabase, mp.GetSubscriber)
+
+                queue.``process``(fun j -> async {()})
+
+                // When
+                let awaiter = queue.jobAwaiter Completed (fun j -> j.jobId = 4L) 10000
+                do! queue.add({ value = "1" }) |> Async.Ignore
+                do! queue.add({ value = "2" }) |> Async.Ignore
+                do! queue.add({ value = "3" }) |> Async.Ignore
+                do! queue.add({ value = "4" }) |> Async.Ignore
+
+                // Then
+                let! awaitedJob = awaiter
+                awaitedJob.data.value |> should equal "4"
+                awaitedJob.jobId |> should equal 4L
+            } |> Async.RunSynchronously
+            
+        [<Fact>]
         let ``it should be possible to ensure delivery of a job to more than one listener`` () = ()
 
         [<Fact>]

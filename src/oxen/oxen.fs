@@ -890,17 +890,14 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     /// wait for a specfic job event to happen
     member x.jobAwaiter eventType predicate timeout =
-        async {
-            let agent = MailboxProcessor<EventAwaiterMessage<'a>>.Start(awaitJobAgent)
-
-            match eventType with 
+        let agent = MailboxProcessor<EventAwaiterMessage<'a>>.Start(awaitJobAgent)
+        match eventType with 
             | Completed -> this.on.Completed.Add(fun e -> agent.Post (Event e))
             | Failed -> this.on.Failed.Add(fun e -> agent.Post(Event e))
             | Progress -> this.on.Progress.Add(fun e -> agent.Post(Event e))
             | _ -> failwith "Not a job event!"
-            
-            return! agent.PostAndAsyncReply  ((fun channel -> WaitFor (predicate, channel)), timeout)
-        }
+        
+        agent.PostAndAsyncReply  ((fun channel -> WaitFor (predicate, channel)), timeout)
 
     //Internals
     member internal x.toKey kind = _toKey kind
