@@ -637,14 +637,13 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         }
 
     let awaitJobAgent (inbox: MailboxProcessor<EventAwaiterMessage<'a>>) = 
-        /// zoek in den lijst of er een job is die overeenkomt met dee job id als we een 
-        /// reply channel en een jobid hebben en return een bool
+        /// look in a list if there's a job that for which the predicate returns true
+        /// and return an option on that job
         let tryFindJob channel jobs = 
             match channel with 
             | None -> None
             | Some (predicate, _) -> jobs |> List.tryFind(predicate)
 
-        /// recursive functie die returnt wanneer den job gevonden is
         let rec mainloop list (channel: ((Job<'a> -> bool) * AsyncReplyChannel<Job<'a>>) option) = 
             async {
                 let! message = inbox.Receive()
@@ -888,7 +887,12 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         NewJob = onNewJob
     }
 
-    /// wait for a specfic job event to happen
+    /// <summary>wait for a specfic job event to happen, the idea is that you start the awaiter before the event
+    /// will happen. So it can collect all events and return when the predicate returns true</summary>
+    /// <param name="evenType">The type of event you want to wait for (Completed, Failed, Progress)</param>
+    /// <param name="predicate">A predicate that takes a job</param>
+    /// <param name="timeout">The amount of time you want to wait before it fails</param>
+    /// <returns>an Async of job that resolves when the job is found</returns>
     member x.jobAwaiter eventType predicate timeout =
         let agent = MailboxProcessor<EventAwaiterMessage<'a>>.Start(awaitJobAgent)
         match eventType with 
