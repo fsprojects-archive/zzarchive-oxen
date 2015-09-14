@@ -19,7 +19,7 @@
 * add constructor to Queue<'a> for convenience
 
 #### 0.2.0 - released
-* add delayed jobs 
+* add delayed jobs
 * add simple retry
 * sync version with bull
 
@@ -29,8 +29,11 @@
 
 #### 0.3.0 - released
 * add queue Empty event
-* start of c# façade
+* start of c# faï¿½ade
 * removes internal blocking calls
 * job stalledjobs before jobs on startup
 * turn off log4net by default
 * removes data returned from the handler (will return later when but wasn't implemented)
+
+#### 0.4.0 - released
+* adds `jobAwaiter` function to allow you to wait for a specific event to happen
