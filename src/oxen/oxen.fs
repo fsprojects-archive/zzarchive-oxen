@@ -97,13 +97,21 @@ type ListType =
     | Set
     | SortedSet
 
+/// [omit]
+type MoveContext<'b> = 
+    | Stacktrace of string
+    | ReturnValue of 'b
+    | Timestamp of float
+
 /// A job that can be added to the queue. Where the generic type specifies the type of the data property
-type Job<'a> =
+type Job<'a, 'b> =
     {
         /// the queue the job belongs to
-        queue: Queue<'a>
+        queue: Queue<'a, 'b>
         /// the data of the job
         data: 'a
+        /// return value
+        returnvalue: 'b option
         /// the job Id
         jobId: int64
         /// the job options
@@ -118,7 +126,7 @@ type Job<'a> =
         stacktrace: string option
     }
     static member private logger = LogManager.getLogger()
-    member private this._logger = Job<'a>.logger
+    member private this._logger = Job<'a, 'b>.logger
     /// returns the redis key for the lock for this job
     member this.lockKey () = this.queue.toKey((this.jobId.ToString ()) + ":lock")
     /// retuns a HashEntry [] containing the data as it's stored in redis
@@ -245,21 +253,34 @@ type Job<'a> =
             return this
         }
 
-    member private this.moveToSet (set, ?timestamp:float) =
+    member private this.moveToSet (context:MoveContext<'b>) =
         async {
             let queue = this.queue
             let client:IDatabase = queue.client()
             let multi = client.CreateTransaction()
             let activeList = queue.toKey("active")
-            let dest = queue.toKey(set)
-            match timestamp with
-            | None ->
-                multi.ListRemoveAsync (activeList, toValueI64 this.jobId) |> ignore
-                multi.SetAddAsync (dest, toValueI64 this.jobId) |> ignore
-            | Some t ->
-                let score = if t < 0. then 0. else t;
+            match context with
+            | Timestamp t ->             
+                let dest = queue.toKey("delayed")       
+                let score = if t < 0. then 0. else t;         
                 multi.SortedSetAddAsync(dest, toValueI64 this.jobId, score) |> ignore
                 multi.PublishAsync(dest |> keyToChannel, t |> toValueFloat) |> ignore
+                
+            | Stacktrace st -> 
+                let dest = queue.toKey("failed")
+                multi.ListRemoveAsync (activeList, toValueI64 this.jobId) |> ignore
+                multi.SetAddAsync (dest, toValueI64 this.jobId) |> ignore
+                multi.HashSetAsync(
+                    queue.toKey(this.jobId |> string),
+                    [| HashEntry(toValueStr "stacktrace", st |> toValueStr) |]) |> ignore
+
+            | ReturnValue b ->
+                let dest = queue.toKey("completed")
+                multi.ListRemoveAsync (activeList, toValueI64 this.jobId) |> ignore
+                multi.SetAddAsync (dest, toValueI64 this.jobId) |> ignore
+                multi.HashSetAsync(
+                    queue.toKey(this.jobId |> string),
+                    [| HashEntry(toValueStr "returnvalue", b |> JsonConvert.SerializeObject |> toValueStr) |]) |> ignore
 
             return! multi.ExecuteAsync() |> Async.AwaitTask
         }
@@ -278,27 +299,18 @@ type Job<'a> =
     member this.isFailed = this.isDone("failed")
 
     /// move this job to the completed list.
-    member this.moveToCompleted () = this.moveToSet("completed")
+    member this.moveToCompleted (returnvalue: 'b) = this.moveToSet(ReturnValue returnvalue)
 
     /// move this job to the failed list.
-    member this.moveToFailed (e) =
-        async {
-            let client = this.queue.client()
-            do! client.HashSetAsync(
-                    this.queue.toKey(this.jobId |> string),
-                    [| HashEntry(toValueStr "stacktrace", e |> string |> toValueStr) |])
-                    |> Async.awaitPlainTask
-            return! this.moveToSet("failed")
-        }
+    member this.moveToFailed (e) = this.moveToSet(Stacktrace (e |> string))
 
     /// move this job to the delayed set at the given timestamp
-    member this.moveToDelayed timestamp =
-        this.moveToSet ("delayed", timestamp)
+    member this.moveToDelayed timestamp = this.moveToSet (Timestamp timestamp)
 
     /// create a new job (note: The job will be stored in redis but it won't be added to the waiting list. You should probably use `Queue.add`)
     static member create (queue, jobId, data:'a, opts) =
         async {
-            Job<_>.logger.Info "creating job for queue %s with id %i and data %A and options %A" (queue:Queue<'a>).name jobId data (opts:Map<string, string> option)
+            Job<_,_>.logger.Info "creating job for queue %s with id %i and data %A and options %A" (queue:Queue<'a, 'b>).name jobId data (opts:Map<string, string> option)
             let delay =
                 match opts with
                 | Some o when (o.ContainsKey "delay") -> Some (o.["delay"] |> Double.Parse)
@@ -319,6 +331,7 @@ type Job<'a> =
                     timestamp = timestamp
                     delay = delay
                     stacktrace = None
+                    returnvalue = None
                 }
             let client:IDatabase = queue.client()
             do! client.HashSetAsync (queue.toKey (jobId.ToString ()), job.toData ()) |> Async.awaitPlainTask
@@ -326,7 +339,7 @@ type Job<'a> =
         }
 
     /// get job from redis by job id and queue
-    static member fromId<'a> (queue: Queue<'a>, jobId:int64) =
+    static member fromId<'a> (queue: Queue<'a, 'b>, jobId:int64) =
         async {
             let client = queue.client
             let! job = client().HashGetAllAsync (queue.toKey(jobId.ToString())) |> Async.AwaitTask
@@ -341,8 +354,12 @@ type Job<'a> =
                 | Some x when x.Value |> string = "undefined" -> None
                 | Some x when x.Value |> float = 0. -> None
                 | Some x -> x.Value |> float |> Some
+            let returnvalue =
+                match jobHash("returnvalue") with
+                | None -> None
+                | Some x -> x.Value |> string |> Some
 
-            return Job.fromData (
+            return Job<'a, 'b>.fromData (
                 queue,
                 jobId,
                 jobHash("data").Value.Value |> string,
@@ -350,16 +367,22 @@ type Job<'a> =
                 jobHash("progress").Value.Value |> int,
                 jobHash("timestamp").Value.Value |> float,
                 stacktrace,
-                delay)
+                delay,
+                returnvalue)
         }
 
     /// create a job from a redis hash
-    static member fromData (queue:Queue<'a>, jobId: Int64, data: string, opts: string, progress: int, timestamp: float, stacktrace: string option, delay: float option) =
+    static member fromData (queue:Queue<'a, 'b>, jobId: Int64, data: string, opts: string, progress: int, timestamp: float, stacktrace: string option, delay: float option, returnValue: string option) =
         let sData = JsonConvert.DeserializeObject<'a>(data)
         let sOpts =
             match JsonConvert.DeserializeObject<Dictionary<string, string>>(opts) with
             | null -> None
             | _ as x -> x |> Seq.map (fun kv -> (kv.Key, kv.Value)) |> Map.ofSeq |> Some
+        let sRetrunValue = 
+            match returnValue with
+            | Some x -> JsonConvert.DeserializeObject<'b>(x) |> Some
+            | None -> None
+
         {
             queue = queue
             data = sData
@@ -369,14 +392,15 @@ type Job<'a> =
             delay = delay
             timestamp = timestamp |> fromUnixTime
             stacktrace = stacktrace
+            returnvalue = sRetrunValue
         }
 
 /// a job event
 /// i.e.: Completed, Progress, Failed
-and OxenJobEvent<'a> =
+and OxenJobEvent<'a, 'b> =
     {
         /// the completed, failed, progressed job
-        job: Job<'a>
+        job: Job<'a, 'b>
         /// the progress reported
         progress: int option
         /// the exception (when a job has failed)
@@ -384,10 +408,10 @@ and OxenJobEvent<'a> =
     }
 /// a queue event
 /// i.e.: Paused, Resumed
-and OxenQueueEvent<'a> =
+and OxenQueueEvent<'a, 'b> =
     {
         /// the queue that was the source of the event.
-        queue: Queue<'a>
+        queue: Queue<'a, 'b>
     }
 /// [omit]
 and OxenNewJobEvent =
@@ -396,34 +420,34 @@ and OxenNewJobEvent =
     }
 
 /// [omit]
-and OxenJobEventDelegate<'a> = delegate of obj * OxenJobEvent<'a> -> unit
+and OxenJobEventDelegate<'a, 'b> = delegate of obj * OxenJobEvent<'a, 'b> -> unit
 
 /// [omit]
-and OxenQueueEventDelegate<'a> = delegate of obj * OxenQueueEvent<'a> -> unit
+and OxenQueueEventDelegate<'a, 'b> = delegate of obj * OxenQueueEvent<'a, 'b> -> unit
 
 /// [omit]
 and OxenNewJobEventDelegate = delegate of obj * OxenNewJobEvent -> unit
 
 /// [omit]
-and Events<'a> = {
-    Completed: IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
-    Progress: IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
-    Failed: IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
-    Paused: IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
-    Resumed: IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
-    Empty: IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+and Events<'a, 'b> = {
+    Completed: IEvent<OxenJobEventDelegate<'a, 'b>, OxenJobEvent<'a, 'b>>
+    Progress: IEvent<OxenJobEventDelegate<'a, 'b>, OxenJobEvent<'a, 'b>>
+    Failed: IEvent<OxenJobEventDelegate<'a, 'b>, OxenJobEvent<'a, 'b>>
+    Paused: IEvent<OxenQueueEventDelegate<'a, 'b>, OxenQueueEvent<'a, 'b>>
+    Resumed: IEvent<OxenQueueEventDelegate<'a, 'b>, OxenQueueEvent<'a, 'b>>
+    Empty: IEvent<OxenQueueEventDelegate<'a, 'b>, OxenQueueEvent<'a, 'b>>
     NewJob: IEvent<OxenNewJobEventDelegate, OxenNewJobEvent>
 }
-and EventAwaiterMessage<'a> =
-    | Event of OxenJobEvent<'a>
-    | WaitFor of (Job<'a> -> bool) * AsyncReplyChannel<Job<'a>>
+and EventAwaiterMessage<'a, 'b> =
+    | Event of OxenJobEvent<'a, 'b>
+    | WaitFor of (Job<'a, 'b> -> bool) * AsyncReplyChannel<Job<'a, 'b>>
 
 /// [omit]
-and LockRenewer<'a> (job:Job<'a>, token:Guid) =
+and LockRenewer<'a, 'b> (job:Job<'a, 'b>, token:Guid) =
     static let logger = LogManager.getLogger()
 
     let cts = new CancellationTokenSource ()
-    let rec lockRenewer (job:Job<'a>) =
+    let rec lockRenewer (job:Job<'a, 'b>) =
         async {
             do! job.renewLock token |> Async.Ignore
             do! Async.Sleep (int(LOCK_RENEW_TIME / 2.0))
@@ -447,33 +471,33 @@ and LockRenewer<'a> (job:Job<'a>, token:Guid) =
         x.Dispose(false)
 
 /// interface that oxen.Queue<'a> implements that gives it a more pleasant c# façade.
-and IOxenQueue<'a> =
+and IOxenQueue<'a, 'b> =
     /// start the queue with the given processor
-    abstract member Process: (Func<Job<'a>, Task>) -> unit
+    abstract member Process: (Func<Job<'a, 'b>, Task<'b>>) -> unit
     /// add a Job
-    abstract member Add: 'a -> Task<Job<'a>>
+    abstract member Add: 'a -> Task<Job<'a, 'b>>
     /// add a Job with options
-    abstract member Add: 'a * Dictionary<string, string> -> Task<Job<'a>>
+    abstract member Add: 'a * Dictionary<string, string> -> Task<Job<'a, 'b>>
 
     /// Event that fires when a Job is completed
     [<CLIEvent>]
-    abstract member OnJobCompleted : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    abstract member OnJobCompleted : IEvent<OxenJobEventDelegate<'a, 'b>, OxenJobEvent<'a, 'b>>
     /// Event that fires when a Job fails
     [<CLIEvent>]
-    abstract member OnJobFailed : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    abstract member OnJobFailed : IEvent<OxenJobEventDelegate<'a, 'b>, OxenJobEvent<'a, 'b>>
     /// Event that fires when the progress of a job is updated.
     [<CLIEvent>]
-    abstract member OnJobProgress : IEvent<OxenJobEventDelegate<'a>, OxenJobEvent<'a>>
+    abstract member OnJobProgress : IEvent<OxenJobEventDelegate<'a, 'b>, OxenJobEvent<'a, 'b>>
     /// Event that fires when the queue is paused
     [<CLIEvent>]
-    abstract member OnQueuePaused : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    abstract member OnQueuePaused : IEvent<OxenQueueEventDelegate<'a, 'b>, OxenQueueEvent<'a, 'b>>
     /// Event that fires when the queue is resumed
     [<CLIEvent>]
-    abstract member OnQueueResumed : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    abstract member OnQueueResumed : IEvent<OxenQueueEventDelegate<'a, 'b>, OxenQueueEvent<'a, 'b>>
     /// Event that fires when the queue is empty, note this will fire often because it will 
     /// check every second whether or not there are new jobs.
     [<CLIEvent>]
-    abstract member OnQueueEmpty : IEvent<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>>
+    abstract member OnQueueEmpty : IEvent<OxenQueueEventDelegate<'a, 'b>, OxenQueueEvent<'a, 'b>>
     /// Event that fires when there are new jobs on the queue.
     [<CLIEvent>]
     abstract member OnNewJob : IEvent<OxenNewJobEventDelegate, OxenNewJobEvent>
@@ -486,7 +510,7 @@ and IOxenQueue<'a> =
 /// <param name="dbFactory">a function returning a new instance of IDatabase</param>
 /// <param name="subscriberFactory">a function returning a new instance of ISubscriber</param>
 /// <param name="forceSequentialProcessing">a boolean specifying whether or not this queue will handle jobs sequentially, not in parallel</param>
-and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber), ?forceSequentialProcessing:bool) as this =
+and Queue<'a, 'b> (name:string, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber), ?forceSequentialProcessing:bool) as this =
     static let logger = LogManager.getLogger()
     static do JsonConvert.DefaultSettings <- Func<JsonSerializerSettings>(fun () ->
         let settings = JsonSerializerSettings()
@@ -505,12 +529,12 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let resumedChannel = _toKey("resumed") |> keyToChannel
     let pausedChannel = _toKey("paused") |> keyToChannel
 
-    let completedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
-    let progressEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
-    let failedEvent = new Event<OxenJobEventDelegate<'a>, OxenJobEvent<'a>> ()
-    let pausedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
-    let resumedEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
-    let emptyEvent = new Event<OxenQueueEventDelegate<'a>, OxenQueueEvent<'a>> ()
+    let completedEvent = new Event<OxenJobEventDelegate<'a, 'b>, OxenJobEvent<'a, 'b>> ()
+    let progressEvent = new Event<OxenJobEventDelegate<'a, 'b>, OxenJobEvent<'a, 'b>> ()
+    let failedEvent = new Event<OxenJobEventDelegate<'a, 'b>, OxenJobEvent<'a, 'b>> ()
+    let pausedEvent = new Event<OxenQueueEventDelegate<'a, 'b>, OxenQueueEvent<'a, 'b>> ()
+    let resumedEvent = new Event<OxenQueueEventDelegate<'a, 'b>, OxenQueueEvent<'a, 'b>> ()
+    let emptyEvent = new Event<OxenQueueEventDelegate<'a, 'b>, OxenQueueEvent<'a, 'b>> ()
     let newJobEvent = new Event<OxenNewJobEventDelegate, OxenNewJobEvent> ()
     
     
@@ -560,13 +584,13 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let processJob handler job =
         async {
             processing <- true
-            use _ = new LockRenewer<'a>(job, token)
+            use _ = new LockRenewer<'a, 'b>(job, token)
             try
                 logger.Info "running handler on job %i queue %s" job.jobId name
-                do! handler job
-                let! result = job.moveToCompleted ()
+                let! returnvalue = handler job
+                let! result = job.moveToCompleted (returnvalue)
                 assert result
-                do! this.emitJobEvent(Completed, job)
+                do! this.emitJobEvent(Completed, job)//{ job with returnvalue = Some returnvalue })
             with
                 | _ as e ->
                     logger.Error "handler failed for job %i with exn %A for queue %s" job.jobId e name
@@ -602,7 +626,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             return! processJobs handler
         }
 
-    let processStalledJob handler (job:Job<'a>) =
+    let processStalledJob handler (job:Job<'a, 'b>) =
         async {
             logger.Info "processing stalled job %i for queue %s" job.jobId name
             let! lock = job.takeLock token
@@ -628,7 +652,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             let! jobs =
                 range
                 |> Seq.map int64
-                |> Seq.map (fun x -> Job.fromId (this, x))
+                |> Seq.map (fun x -> Job<_,_>.fromId (this, x))
                 |> Async.Parallel
 
             let stalledJobsHandler = processStalledJob handler
@@ -636,7 +660,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             return! jobs |> Seq.map stalledJobsHandler |> Async.Parallel |> Async.Ignore
         }
 
-    let awaitJobAgent (inbox: MailboxProcessor<EventAwaiterMessage<'a>>) = 
+    let awaitJobAgent (inbox: MailboxProcessor<EventAwaiterMessage<'a, 'b>>) = 
         /// look in a list if there's a job that for which the predicate returns true
         /// and return an option on that job
         let tryFindJob channel jobs = 
@@ -644,7 +668,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             | None -> None
             | Some (predicate, _) -> jobs |> List.tryFind(predicate)
 
-        let rec mainloop list (channel: ((Job<'a> -> bool) * AsyncReplyChannel<Job<'a>>) option) = 
+        let rec mainloop list (channel: ((Job<'a, 'b> -> bool) * AsyncReplyChannel<Job<'a, 'b>>) option) = 
             async {
                 let! message = inbox.Receive()
 
@@ -665,9 +689,8 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             }
                     
         mainloop [] None
-     
 
-    interface IOxenQueue<'a> with
+    interface IOxenQueue<'a, 'b> with
         member this.Add (data) =
             this.add(data) |> Async.StartAsTask
                
@@ -676,7 +699,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             this.add(data, opts) |> Async.StartAsTask
 
         member this.Process(handler) = 
-            this.``process``(fun j -> handler.Invoke(j) |> Async.awaitPlainTask)   
+            this.``process``(fun j -> handler.Invoke(j) |> Async.AwaitTask)   
         
         [<CLIEvent>]
         member this.OnJobCompleted = onCompleted
@@ -692,23 +715,27 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         member this.OnQueueEmpty = onEmpty
         [<CLIEvent>]
         member this.OnNewJob = onNewJob
+    
+//    /// create a new queue
+//    new (name:string, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> ISubscriber)) =
+//        Queue<'a, 'b>(name, dbFactory, subscriberFactory, false)
 
     /// create a new queue
-    new (name, mp:ConnectionMultiplexer) =
-        Queue<'a>(name, mp.GetDatabase, mp.GetSubscriber)
+    new (name:string, mp:ConnectionMultiplexer) =
+        Queue<'a, 'b>(name, (fun () -> mp.GetDatabase()), (fun () -> mp.GetSubscriber()), false)
 
     /// create a new queue using factory funcs in c#
-    new (name, dbFactory:Func<IDatabase>, subFactory:Func<ISubscriber>) =
+    new (name:string, dbFactory:Func<IDatabase>, subFactory:Func<ISubscriber>) =
         let dbFactory () = dbFactory.Invoke()
         let subFactory () = subFactory.Invoke()
-        Queue<'a>(name, dbFactory, subFactory, false)
+        Queue<'a, 'b>(name, dbFactory, subFactory, false)
 
     /// the name of the queue use this to uniquely identify the queue. (note: will be used in the redis keys like "bull:<queuename>:wait"
     member x.name = name
 
     /// start the queue.
     /// Takes handler: `Job<'a> -> Async<unit>` that will be called for every job this queue handles.
-    member x.``process`` (handler:Job<'a> -> Async<unit>) =
+    member x.``process`` (handler:Job<'a, 'b> -> Async<'b>) =
         logger.Info "start processing queue %s" name
         this.run handler |> Async.Start
 
@@ -729,7 +756,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
                 | None -> None
             let! jobId = this.client().StringIncrementAsync (this.toKey "id") |> Async.AwaitTask
             logger.Info "adding job %i to the queue %s" jobId name
-            let! job = Job<'a>.create (this, jobId, data, opts)
+            let! job = Job<'a, 'b>.create (this, jobId, data, opts)
             let key = this.toKey "wait"
             let multi = this.client().CreateTransaction()
 
@@ -835,7 +862,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         this.client().ListRightPopLeftPushAsync(src, dest) |> Async.AwaitTask
 
     /// get a job by it's id
-    member x.getJob id = Job<'a>.fromId (this, id)
+    member x.getJob id = Job<'a, 'b>.fromId (this, id)
 
     /// get all jobs from the queue
     member x.getJobs (queueType, listType:ListType, ?start, ?stop) =
@@ -859,7 +886,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         }
 
     /// retry jobs
-    member x.retryJob (job:Job<'a>) = job.retry()
+    member x.retryJob (job:Job<'a, 'b>) = job.retry()
 
     /// get all failed jobs
     member x.getFailed () = this.getJobs ("failed", Set)
@@ -894,7 +921,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     /// <param name="timeout">The amount of time you want to wait before it fails</param>
     /// <returns>an Async of job that resolves when the job is found</returns>
     member x.jobAwaiter eventType =
-        let agent = MailboxProcessor<EventAwaiterMessage<'a>>.Start(awaitJobAgent)
+        let agent = MailboxProcessor<EventAwaiterMessage<'a, 'b>>.Start(awaitJobAgent)
         match eventType with 
             | Completed -> this.on.Completed.Add(fun e -> agent.Post (Event e))
             | Failed -> this.on.Failed.Add(fun e -> agent.Post(Event e))
@@ -919,7 +946,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             | _ -> failwith "Not a queue event!"
         }
 
-    member internal x.emitJobEvent (eventType, job:Job<'a>, ?value, ?exn) =
+    member internal x.emitJobEvent (eventType, job:Job<'a, 'b>, ?value, ?exn) =
         async {
             let eventData =
                 {
@@ -979,3 +1006,69 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
         }
 
     member internal x.client = dbFactory
+ 
+and Job<'a> = Job<'a, unit>
+
+/// interface that oxen.Queue<'a> implements that gives it a more pleasant c# façade.
+and IOxenQueue<'a> =
+    /// start the queue with the given processor
+    abstract member Process: (Func<Job<'a>, Task>) -> unit
+    /// add a Job
+    abstract member Add: 'a -> Task<Job<'a>>
+    /// add a Job with options
+    abstract member Add: 'a * Dictionary<string, string> -> Task<Job<'a>>
+
+    /// Event that fires when a Job is completed
+    [<CLIEvent>]
+    abstract member OnJobCompleted : IEvent<OxenJobEventDelegate<'a, unit>, OxenJobEvent<'a, unit>>
+    /// Event that fires when a Job fails
+    [<CLIEvent>]
+    abstract member OnJobFailed : IEvent<OxenJobEventDelegate<'a, unit>, OxenJobEvent<'a, unit>>
+    /// Event that fires when the progress of a job is updated.
+    [<CLIEvent>]
+    abstract member OnJobProgress : IEvent<OxenJobEventDelegate<'a, unit>, OxenJobEvent<'a, unit>>
+    /// Event that fires when the queue is paused
+    [<CLIEvent>]
+    abstract member OnQueuePaused : IEvent<OxenQueueEventDelegate<'a, unit>, OxenQueueEvent<'a, unit>>
+    /// Event that fires when the queue is resumed
+    [<CLIEvent>]
+    abstract member OnQueueResumed : IEvent<OxenQueueEventDelegate<'a, unit>, OxenQueueEvent<'a, unit>>
+    /// Event that fires when the queue is empty, note this will fire often because it will 
+    /// check every second whether or not there are new jobs.
+    [<CLIEvent>]
+    abstract member OnQueueEmpty : IEvent<OxenQueueEventDelegate<'a, unit>, OxenQueueEvent<'a, unit>>
+    /// Event that fires when there are new jobs on the queue.
+    [<CLIEvent>]
+    abstract member OnNewJob : IEvent<OxenNewJobEventDelegate, OxenNewJobEvent>
+
+and Queue<'a> = 
+    inherit Queue<'a, unit>
+    new (name:string, db:(unit -> IDatabase), sub:(unit -> ISubscriber), ?fsp: bool) = { inherit Queue<'a, unit>(name, db, sub, fsp |? false) }
+    new (name:string, db:(Func<IDatabase>), sub:(Func<ISubscriber>)) = { inherit Queue<'a, unit>(name, db, sub) }
+    new (name:string, mp:ConnectionMultiplexer) = { inherit Queue<'a,unit>(name, mp) }
+
+    interface IOxenQueue<'a> with
+        member this.Add (data) =
+            this.add(data) |> Async.StartAsTask
+               
+        member this.Add (data, options) = 
+            let opts = options |> Seq.map (fun i -> (i.Key, i.Value)) |> Seq.toList
+            this.add(data, opts) |> Async.StartAsTask
+
+        member this.Process(handler) = 
+            this.``process``(fun j -> handler.Invoke(j) |> Async.awaitPlainTask)   
+        
+        [<CLIEvent>]
+        member this.OnJobCompleted = this.on.Completed
+        [<CLIEvent>]
+        member this.OnJobFailed = this.on.Failed
+        [<CLIEvent>]
+        member this.OnJobProgress = this.on.Progress
+        [<CLIEvent>]
+        member this.OnQueuePaused = this.on.Paused
+        [<CLIEvent>]
+        member this.OnQueueResumed = this.on.Resumed
+        [<CLIEvent>]
+        member this.OnQueueEmpty = this.on.Empty
+        [<CLIEvent>]
+        member this.OnNewJob = this.on.NewJob
