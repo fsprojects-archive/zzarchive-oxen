@@ -41,3 +41,7 @@
 #### 0.4.1 - released
 * changes `jobAwaiter` so you can start waiting for jobs before you know what
   the predicate will look like.
+
+#### 0.4.2 - released
+* change timeout for waiting on jobs.
+* don't log the empty event
