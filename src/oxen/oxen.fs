@@ -911,7 +911,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
 
     member internal x.emitQueueEvent (eventType) =
         async {
-            logger.Info "emitting new queue-event %A for queue %s" eventType name
             match eventType with
             | Paused -> pausedEvent.Trigger(x, { queue = this })
             | Resumed -> resumedEvent.Trigger(x, { queue = this })
