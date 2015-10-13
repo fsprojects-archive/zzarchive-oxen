@@ -582,7 +582,7 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
             | g when g.HasValue -> return! this.getJob (g |> int64)
             | _ ->
                 do! this.emitQueueEvent(Empty)
-                do! onNewJob |> Async.AwaitEvent |> Async.WithTimeout 1000 |> Async.Ignore
+                do! onNewJob |> Async.AwaitEvent |> Async.WithTimeout (int LOCK_RENEW_TIME) |> Async.Ignore
                 return! getNextJob ()
         }
 
