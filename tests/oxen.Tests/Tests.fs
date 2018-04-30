@@ -144,12 +144,33 @@ type JobFixture () =
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
         // When
-        let job = Job.fromData(q, 1L, "{ \"value\": \"test\" }", "", 1, DateTime.Now |> toUnixTime, None, None)
+        let job = Job<_>.fromData(q, 1L, "{ \"value\": \"test\" }", "", 1, DateTime.Now |> toUnixTime, None, None, None)
 
         // Then
         job.data.value |> should equal "test"
         job.jobId |> should equal 1L
         job._progress |> should equal 1
+
+    [<Fact>]
+    let ``should create a new job from given json data and return json data`` () =
+        // Given
+        let db = Mock<IDatabase>().Create();
+        let sub = Mock<ISubscriber>.With(fun s ->
+            <@
+                s.PublishAsync(any(), any(), any()) --> taskLong()
+            @>
+        )
+
+        let q = Queue<Data, OtherData>("stuff", (fun () -> db), (fun () -> sub))
+
+        // When
+        let job = Job<Data, OtherData>.fromData(q, 1L, "{ \"value\": \"test\" }", "", 1, DateTime.Now |> toUnixTime, None, None, Some "{ \"Value\": \"return value\" }")
+
+        // Then
+        job.data.value |> should equal "test"
+        job.jobId |> should equal 1L
+        job._progress |> should equal 1
+        job.returnvalue.Value |> should equal { Value = "return value" }
 
     [<Fact>]
     let ``should get a job from the cache and make it into a real one`` () =
@@ -167,7 +188,7 @@ type JobFixture () =
         let q = Queue<Data>("stuff", (fun () -> db), (fun () -> sub))
 
         // When
-        let job = Job.fromId(q, 1L) |> Async.RunSynchronously
+        let job = Job<_>.fromId(q, 1L) |> Async.RunSynchronously
 
         // Then
         job.data.value |> should equal "test"
@@ -198,6 +219,7 @@ type JobFixture () =
             delay = None
             timestamp = DateTime.Now
             stacktrace = None
+            returnvalue = None
         }
 
         // When
@@ -232,6 +254,7 @@ type JobFixture () =
             delay = None
             timestamp = DateTime.Now
             stacktrace = None
+            returnvalue = None
         }
 
         // When
@@ -462,13 +485,38 @@ type QueueFixture () =
 
             async {
                 // When
-                do! queue.add({value = "test"}) |> Async.Ignore |> Async.StartChild  |> Async.Ignore
+                do! queue.add({value = "test"}) |> Async.Ignore |> Async.StartChild |> Async.Ignore
                 do! queue.on.Completed |> Async.AwaitEvent |> Async.Ignore
                 let! active = queue.getActive()
                 let! completed = queue.getCompleted()
 
                 // Then
                 !newJob |> should be True
+                (active |> Array.length) |> should equal 0
+                (completed |> Array.length) |> should equal 1
+            } |> Async.RunSynchronously
+
+        [<Fact>]
+        let ``should be able to return something from the handler`` () =
+            // Given
+            let mp = ConnectionMultiplexer.Connect("localhost, allowAdmin=true, resolveDns=true")
+            let queue = Queue<Data, double>((Guid.NewGuid ()).ToString(), mp.GetDatabase, mp.GetSubscriber)
+            let newJob = ref false
+            do queue.``process`` (fun _ -> async { 
+                newJob := true 
+                return 0.1
+            })
+
+            async {
+                // When
+                do! queue.add({value = "test"}) |> Async.Ignore |> Async.StartChild  |> Async.Ignore
+                let! completedJob = queue.on.Completed |> Async.AwaitEvent
+                let! active = queue.getActive()
+                let! completed = queue.getCompleted()
+
+                // Then
+                !newJob |> should be True
+                //completedJob.job.returnvalue.Value |> should equal 0.1
                 (active |> Array.length) |> should equal 0
                 (completed |> Array.length) |> should equal 1
             } |> Async.RunSynchronously
