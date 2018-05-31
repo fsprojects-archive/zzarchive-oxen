@@ -525,18 +525,6 @@ and Queue<'a> (name, dbFactory:(unit -> IDatabase), subscriberFactory:(unit -> I
     let sub = subscriberFactory ()
     do sub.Subscribe(newJobChannel, (fun _ v -> newJobEvent.Trigger(this, { jobId = v |> int64 })))
 
-    let rec ensureSubscription () =
-        async {
-            let! res = sub.PublishAsync (newJobChannel, -1L |> toValueI64)  |> Async.AwaitTask
-            if res >= 1L then 
-                ()
-            else 
-                return! ensureSubscription ()
-            do! Async.Sleep 10
-        }
-
-    do ensureSubscription () |> Async.RunSynchronously
-
     do sub.Subscribe(
                 delayedJobChannel,
                 (fun c v ->
