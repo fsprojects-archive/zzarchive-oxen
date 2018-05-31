@@ -276,11 +276,11 @@ Target "All" DoNothing
 
 "Clean"
   ==> "AssemblyInfo"
-  #if MONO
-  ==> "CloneStackExchangeRedis"
-  ==> "BuildStackExchangeRedis"
-  ==> "CopyStackExchangeRedis"
-  #endif
+  //#if MONO
+  //==> "CloneStackExchangeRedis"
+  //==> "BuildStackExchangeRedis"
+  //==> "CopyStackExchangeRedis"
+  //#endif
   ==> "Build"
   #if MONO
   #else
