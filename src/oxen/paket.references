@@ -1,3 +1,4 @@
 log4net
 Newtonsoft.Json
 StackExchange.Redis
+fsharp.core

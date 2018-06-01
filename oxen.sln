@@ -44,7 +44,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{ED8079DD
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "oxen.Tests", "tests\oxen.Tests\oxen.Tests.fsproj", "{E789C72A-5CFD-436B-8EF1-61AA2852A89F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "oxen.FaçadeTests", "tests\oxen.FaçadeTests\oxen.FaçadeTests.csproj", "{F6BCE791-2565-4F12-8FAE-93161E45A558}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "oxen.FaÃ§adeTests", "tests\oxen.FaÃ§adeTests\oxen.FaÃ§adeTests.csproj", "{F6BCE791-2565-4F12-8FAE-93161E45A558}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

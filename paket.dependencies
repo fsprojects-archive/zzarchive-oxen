@@ -1,5 +1,6 @@
 source https://nuget.org/api/v2
 
+nuget fsharp.core
 nuget FSharp.Formatting
 nuget FsUnit.xUnit  framework: >= net40
 nuget FAKE
@@ -9,7 +10,7 @@ nuget XunitShould
 nuget log4net framework: >= net451
 nuget Newtonsoft.Json framework: >= net451
 nuget StackExchange.Redis framework: >= net451
-nuget moq
+nuget moq 4.7.145
 nuget xunit 1.9.2
 nuget xunit.runner.visualstudio framework: >= net451
 nuget xunit.runner.console

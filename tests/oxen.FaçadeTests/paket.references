@@ -2,3 +2,4 @@ xunit
 moq
 StackExchange.Redis
 XunitShould
+fsharp.core

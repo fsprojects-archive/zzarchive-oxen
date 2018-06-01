@@ -139,7 +139,7 @@ Target "Build" (fun _ ->
 
 Target "StartRedis" (fun _ ->
     async {
-        Shell.Exec("./packages/Redis-64/redis-server.exe", "--maxheap 200mb") |> ignore
+        Shell.Exec("./packages/Redis-64/tools/redis-server.exe") |> ignore
     } |> Async.Start
 )
 
@@ -176,7 +176,7 @@ Target "RunTests" (fun _ ->
     !! testAssemblies
     |> xUnit (fun p ->
         { p with
-            ToolPath = "./packages/xunit.runner.console/tools/xunit.console.exe"
+            ToolPath = "./packages/xunit.runner.console/tools/net452/xunit.console.exe"
             TimeOut = TimeSpan.FromMinutes 20.
             OutputDir = "./" })
 )
@@ -276,11 +276,11 @@ Target "All" DoNothing
 
 "Clean"
   ==> "AssemblyInfo"
-  #if MONO
-  ==> "CloneStackExchangeRedis"
-  ==> "BuildStackExchangeRedis"
-  ==> "CopyStackExchangeRedis"
-  #endif
+  //#if MONO
+  //==> "CloneStackExchangeRedis"
+  //==> "BuildStackExchangeRedis"
+  //==> "CopyStackExchangeRedis"
+  //#endif
   ==> "Build"
   #if MONO
   #else
