@@ -1,5 +1,6 @@
 source https://nuget.org/api/v2
 
+nuget fsharp.core
 nuget FSharp.Formatting
 nuget FsUnit.xUnit  framework: >= net40
 nuget FAKE
